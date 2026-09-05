@@ -149,6 +149,15 @@ export default function CaseManagement() {
     }
   };
 
+  // Smart Navigation: Go to Output if processed data exists, else Data Sources
+  const handleCaseClick = (caseId) => {
+    if (localStorage.getItem(`output_${caseId}`)) {
+      navigate(`/output?caseId=${caseId}`);
+    } else {
+      navigate(`/data-sources?caseId=${caseId}`);
+    }
+  };
+
   // Filter & Search Logic
   const filteredCases = cases.filter((c) => {
     const matchesSearch = 
@@ -423,15 +432,15 @@ export default function CaseManagement() {
 
                         {/* Clickable Case ID */}
                         <td
-                          onClick={() => navigate(`/data-sources?caseId=${c.case_id}`)}
+                          onClick={() => handleCaseClick(c.case_id)}
                           className="py-3 px-4 font-mono font-bold text-blue-600 hover:underline cursor-pointer whitespace-nowrap"
                         >
                           {c.case_id}
                         </td>
 
-                        {/* Clickable Case Title → opens Data Sources scoped to this case */}
+                        {/* Clickable Case Title → opens Data Sources or Output scoped to this case */}
                         <td
-                          onClick={() => navigate(`/data-sources?caseId=${c.case_id}`)}
+                          onClick={() => handleCaseClick(c.case_id)}
                           className="py-3 px-4 font-semibold text-slate-900 max-w-xs truncate hover:text-blue-600 hover:underline cursor-pointer"
                           title={`Open Data Sources for ${c.case_id}`}
                         >
@@ -461,10 +470,10 @@ export default function CaseManagement() {
                         </td>
                         <td className="py-3 px-4 whitespace-nowrap text-slate-400">{c.created_at?.split(' ')[0]}</td>
 
-                        {/* View → Data Sources for this case */}
+                        {/* View → Data Sources or Output for this case */}
                         <td className="py-3 px-4 text-right whitespace-nowrap">
                           <button
-                            onClick={() => navigate(`/data-sources?caseId=${c.case_id}`)}
+                            onClick={() => handleCaseClick(c.case_id)}
                             className="inline-flex items-center space-x-1 text-xs text-blue-600 hover:text-blue-800 font-semibold"
                           >
                             <Eye className="h-3.5 w-3.5" />

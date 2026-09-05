@@ -14,13 +14,12 @@ import {
   CheckCircle,
   Share2
 } from 'lucide-react';
-import html2pdf from 'html2pdf.js';
+import * as XLSX from 'xlsx';
 
 export default function Output() {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const pdfRef = useRef(null);
 
   const [rawPipelineData, setRawPipelineData] = useState(null);
   const [groupedRecords, setGroupedRecords] = useState({});
@@ -116,30 +115,47 @@ export default function Output() {
     { step: 5, title: 'Output', sub: 'Ready for analysis', path: '/dashboard' },
   ];
 
-  // PDF Export Engine
-  const handleExportPDF = () => {
+  // Excel Export Engine
+  const handleExportExcel = () => {
     setIsExporting(true);
-    const element = pdfRef.current;
+    try {
+      const workbook = XLSX.utils.book_new();
 
-    const opt = {
-      margin: [10, 10, 10, 10],
-      filename: `MuleGuard_Evidence_Report_${new Date().toISOString().slice(0, 10)}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, logging: false },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
-    };
+      Object.entries(groupedRecords).forEach(([fileName, fileRecords]) => {
+        const datasetColumns = getColumnsForDataset(fileRecords);
+        const wsData = fileRecords.map((row, idx) => {
+          const newRow = { '#': idx + 1 };
+          datasetColumns.forEach(col => {
+             let val = row[col];
+             if (typeof val === 'object' && val !== null) {
+                val = JSON.stringify(val);
+             }
+             newRow[formatHeader(col)] = val;
+          });
+          newRow['STATUS'] = 'Enriched';
+          return newRow;
+        });
 
-    html2pdf()
-      .set(opt)
-      .from(element)
-      .save()
-      .then(() => {
-        setIsExporting(false);
-      })
-      .catch((err) => {
-        console.error('PDF Export Error:', err);
-        setIsExporting(false);
+        const worksheet = XLSX.utils.json_to_sheet(wsData);
+        let sheetName = fileName.replace(/[\\/*?:[\]]/g, '').slice(0, 31);
+        if (!sheetName) sheetName = 'Data';
+        
+        let uniqueName = sheetName;
+        let counter = 1;
+        while(workbook.SheetNames.includes(uniqueName)) {
+           uniqueName = `${sheetName.slice(0, 27)}_${counter}`;
+           counter++;
+        }
+        XLSX.utils.book_append_sheet(workbook, worksheet, uniqueName);
       });
+
+      const reportName = `MuleGuard_Evidence_Report_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      XLSX.writeFile(workbook, reportName);
+    } catch (err) {
+      console.error('Excel Export Error:', err);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const formatHeader = (key) => {
@@ -238,12 +254,12 @@ export default function Output() {
             </div>
 
             <button
-              onClick={handleExportPDF}
+              onClick={handleExportExcel}
               disabled={isExporting || totalRecordCount === 0}
               className="px-5 py-2.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 shadow-md flex items-center space-x-2 disabled:opacity-50"
             >
               <Download className="h-4 w-4" />
-              <span>{isExporting ? 'Generating PDF...' : 'Export PDF Report'}</span>
+              <span>{isExporting ? 'Generating Excel...' : 'Export Excel Report'}</span>
             </button>
           </div>
 
@@ -348,8 +364,8 @@ export default function Output() {
             </div>
           </div>
 
-          {/* Printable Container for PDF Export */}
-          <div ref={pdfRef} className="space-y-8 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          {/* Printable Container for Export Preview */}
+          <div className="space-y-8 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
             
             {/* Printable Report Header */}
             <div className="border-b border-slate-200 pb-4 flex items-center justify-between">
