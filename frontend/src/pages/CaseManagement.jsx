@@ -419,55 +419,59 @@ export default function CaseManagement() {
                 <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
                   {filteredCases.length > 0 ? (
                     filteredCases.map((c) => (
-                     <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
-  {filteredCases.length > 0 ? (
-    filteredCases.map((c) => (
-      <tr key={c.case_id} className="hover:bg-slate-50 transition">
-        
-        {/* 1. Clickable Case ID */}
-        <td 
-          onClick={() => navigate(`/cases/${c.case_id}`)}
-          className="py-3 px-4 font-mono font-bold text-blue-600 hover:underline cursor-pointer whitespace-nowrap"
-        >
-          {c.case_id}
-        </td>
+                      <tr key={c.case_id} className="hover:bg-slate-50 transition">
 
-        <td className="py-3 px-4 font-semibold text-slate-900 max-w-xs truncate">{c.title}</td>
-        <td className="py-3 px-4 font-mono text-slate-500 whitespace-nowrap">{c.police_ref_id}</td>
-        <td className="py-3 px-4 whitespace-nowrap">{c.officer}</td>
-        <td className="py-3 px-4 whitespace-nowrap text-slate-500">{c.department}</td>
-        <td className="py-3 px-4 whitespace-nowrap">
-          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold border bg-blue-50 text-blue-700 border-blue-200">
-            {c.status}
-          </span>
-        </td>
-        <td className="py-3 px-4 whitespace-nowrap">
-          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold border bg-slate-50 text-slate-700 border-slate-200">
-            {c.priority}
-          </span>
-        </td>
-        <td className="py-3 px-4 whitespace-nowrap text-slate-400">{c.created_at?.split(' ')[0]}</td>
+                        {/* Clickable Case ID */}
+                        <td
+                          onClick={() => navigate(`/data-sources?caseId=${c.case_id}`)}
+                          className="py-3 px-4 font-mono font-bold text-blue-600 hover:underline cursor-pointer whitespace-nowrap"
+                        >
+                          {c.case_id}
+                        </td>
 
-        {/* 2. Action Button Navigation */}
-        <td className="py-3 px-4 text-right whitespace-nowrap">
-          <button
-            onClick={() => navigate(`/cases/${c.case_id}`)}
-            className="inline-flex items-center space-x-1 text-xs text-blue-600 hover:text-blue-800 font-semibold"
-          >
-            <Eye className="h-3.5 w-3.5" />
-            <span>View</span>
-          </button>
-        </td>
-      </tr>
-    ))
-  ) : (
-    <tr>
-      <td colSpan={9} className="py-8 text-center text-slate-400">
-        No cases match the specified search or filter criteria.
-      </td>
-    </tr>
-  )}
-</tbody>
+                        {/* Clickable Case Title → opens Data Sources scoped to this case */}
+                        <td
+                          onClick={() => navigate(`/data-sources?caseId=${c.case_id}`)}
+                          className="py-3 px-4 font-semibold text-slate-900 max-w-xs truncate hover:text-blue-600 hover:underline cursor-pointer"
+                          title={`Open Data Sources for ${c.case_id}`}
+                        >
+                          {c.title}
+                        </td>
+
+                        <td className="py-3 px-4 font-mono text-slate-500 whitespace-nowrap">{c.police_ref_id}</td>
+                        <td className="py-3 px-4 whitespace-nowrap">{c.officer}</td>
+                        <td className="py-3 px-4 whitespace-nowrap text-slate-500">{c.department}</td>
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${
+                            c.status === 'In Progress' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                            c.status === 'Closed' ? 'bg-slate-100 text-slate-500 border-slate-200' :
+                            'bg-blue-50 text-blue-700 border-blue-200'
+                          }`}>
+                            {c.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${
+                            c.priority === 'High' ? 'bg-red-50 text-red-700 border-red-200' :
+                            c.priority === 'Medium' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                            'bg-slate-100 text-slate-700 border-slate-200'
+                          }`}>
+                            {c.priority}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 whitespace-nowrap text-slate-400">{c.created_at?.split(' ')[0]}</td>
+
+                        {/* View → Data Sources for this case */}
+                        <td className="py-3 px-4 text-right whitespace-nowrap">
+                          <button
+                            onClick={() => navigate(`/data-sources?caseId=${c.case_id}`)}
+                            className="inline-flex items-center space-x-1 text-xs text-blue-600 hover:text-blue-800 font-semibold"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            <span>View</span>
+                          </button>
+                        </td>
+                      </tr>
                     ))
                   ) : (
                     <tr>

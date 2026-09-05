@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   UploadCloud,
   FileText,
@@ -28,6 +28,10 @@ import { processImageFile } from '../utils/ocrProcessor';
 
 export default function DataSource() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Read caseId from ?caseId=MG-XXXX-XXXX query param (falls back to a default)
+  const activeCaseId = searchParams.get('caseId') || 'MG-2024-1024';
 
   // Active Pipeline Step
   const [activeStep, setActiveStep] = useState(1);
@@ -40,16 +44,34 @@ export default function DataSource() {
   const fileInputRef = useRef(null);
   const folderInputRef = useRef(null);
 
+  // Per-case uploaded files (persisted in localStorage)
+  const [caseFiles, setCaseFiles] = useState([]);
+
+  // Load previously uploaded files for this case from localStorage
+  useEffect(() => {
+    const key = `muleguard_files_${activeCaseId}`;
+    try {
+      const stored = localStorage.getItem(key);
+      if (stored) setCaseFiles(JSON.parse(stored));
+      else setCaseFiles([]);
+    } catch { setCaseFiles([]); }
+  }, [activeCaseId]);
+
   // Categorization & Metadata Form
   const [selectedSourceCategory, setSelectedSourceCategory] = useState('upload');
   const [formData, setFormData] = useState({
     sourceType: 'GENERIC',
     sourceOrg: 'Chandigarh Police Dept',
     description: '',
-    caseId: 'MG-2024-1024',
+    caseId: activeCaseId,
     acquiredDate: new Date().toISOString().split('T')[0],
     timezone: 'Asia/Kolkata'
   });
+
+  // Keep formData.caseId in sync if URL param changes
+  useEffect(() => {
+    setFormData(prev => ({ ...prev, caseId: activeCaseId }));
+  }, [activeCaseId]);
 
   // Source Categories mapped to backend Enum Types
   const sourceCategories = [
@@ -272,6 +294,23 @@ export default function DataSource() {
       setUploadProgress(100);
       localStorage.setItem('pipelineData', JSON.stringify(result));
 
+      // Persist file metadata for this case in localStorage
+      const newFileEntries = selectedFiles.map((file) => ({
+        file_id: `EVT-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
+        filename: file.name,
+        file_type: file.type || 'application/octet-stream',
+        file_size: file.size,
+        upload_timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+        case_id: activeCaseId,
+        source_type: formData.sourceType,
+        source_org: formData.sourceOrg,
+      }));
+      const storageKey = `muleguard_files_${activeCaseId}`;
+      const existing = JSON.parse(localStorage.getItem(storageKey) || '[]');
+      const updated = [...existing, ...newFileEntries];
+      localStorage.setItem(storageKey, JSON.stringify(updated));
+      setCaseFiles(updated);
+
       setTimeout(() => {
         setIsUploading(false);
         setSelectedFiles([]);
@@ -288,11 +327,29 @@ export default function DataSource() {
 
       const fallbackPayload = {
         status: 'INGESTED',
-        case_id: formData.caseId,
+        case_id: activeCaseId,
         records: fallbackRecords
       };
 
       localStorage.setItem('pipelineData', JSON.stringify(fallbackPayload));
+
+      // Persist file metadata even on backend failure (fallback)
+      const fallbackFileEntries = selectedFiles.map((file) => ({
+        file_id: `EVT-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
+        filename: file.name,
+        file_type: file.type || 'application/octet-stream',
+        file_size: file.size,
+        upload_timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+        case_id: activeCaseId,
+        source_type: formData.sourceType,
+        source_org: formData.sourceOrg,
+      }));
+      const fallbackKey = `muleguard_files_${activeCaseId}`;
+      const fallbackExisting = JSON.parse(localStorage.getItem(fallbackKey) || '[]');
+      const fallbackUpdated = [...fallbackExisting, ...fallbackFileEntries];
+      localStorage.setItem(fallbackKey, JSON.stringify(fallbackUpdated));
+      setCaseFiles(fallbackUpdated);
+
       setIsUploading(false);
       setUploadProgress(0);
       navigate('/preprocessing', { state: { pipelineData: fallbackPayload } });
@@ -375,6 +432,20 @@ export default function DataSource() {
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
+          </div>
+
+          {/* Case Context Banner — shows which case this Data Sources view is scoped to */}
+          <div className="flex items-center space-x-3 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-2.5">
+            <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
+            <span className="text-xs font-semibold text-indigo-700">Active Case:</span>
+            <span className="text-xs font-bold text-indigo-900 font-mono">{activeCaseId}</span>
+            <span className="text-xs text-indigo-500">— All uploaded files will be stored against this case ID</span>
+            <button
+              onClick={() => navigate('/cases')}
+              className="ml-auto text-[11px] text-indigo-600 hover:text-indigo-800 font-semibold underline"
+            >
+              ← Back to Cases
+            </button>
           </div>
 
           {/* Dynamic Workflow Bar */}
@@ -711,6 +782,42 @@ export default function DataSource() {
             </div>
 
           </div>
+
+          {/* Uploaded Files for this Case — persisted across page refreshes */}
+          {caseFiles.length > 0 && (
+            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <div className="flex items-center space-x-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Uploaded Files for Case <span className="font-mono text-indigo-700">{activeCaseId}</span>
+                  </h3>
+                </div>
+                <span className="text-xs text-slate-400 font-medium">
+                  {caseFiles.length} file{caseFiles.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                {caseFiles.map((f) => (
+                  <div key={f.file_id} className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-100 rounded-lg text-xs">
+                    <div className="flex items-center space-x-3">
+                      {getFileIcon(f.filename)}
+                      <div>
+                        <p className="font-semibold text-slate-800">{f.filename}</p>
+                        <p className="text-[10px] text-slate-400">
+                          {f.source_type} • {(f.file_size / 1024).toFixed(1)} KB • {f.upload_timestamp}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold px-2 py-0.5 rounded">
+                      Ingested
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
         </div>
 
         {/* System Footer */}
