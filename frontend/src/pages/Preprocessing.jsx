@@ -51,7 +51,19 @@ export default function Preprocessing() {
 
   // 1. Retrieve Payload and Discover All Dynamic Keys Across Any Input
   useEffect(() => {
-    const rawData = location.state?.pipelineData || JSON.parse(localStorage.getItem('pipelineData') || '{}');
+    // Extract caseId from navigate state (passed from DataSources)
+    const caseId = location.state?.caseId;
+
+    // Load from case-scoped key first, then route state, then global fallback
+    let rawData;
+    if (caseId) {
+      const caseScoped = localStorage.getItem(`pipelineData_${caseId}`);
+      rawData = caseScoped
+        ? JSON.parse(caseScoped)
+        : (location.state?.pipelineData || JSON.parse(localStorage.getItem('pipelineData') || '{}'));
+    } else {
+      rawData = location.state?.pipelineData || JSON.parse(localStorage.getItem('pipelineData') || '{}');
+    }
     setRawPipelineData(rawData);
 
     // Extract dynamic array from backend/ingestion payload (supports multiple key conventions)
@@ -202,15 +214,21 @@ export default function Preprocessing() {
   };
 
   const handleProceedToNormalization = () => {
+    const caseId = location.state?.caseId || rawPipelineData?.case_id;
     const updatedPayload = {
       ...rawPipelineData,
       records: processedRecords,
       columns: dynamicColumns,
       files: rawPipelineData?.files || [],
-      status: 'PREPROCESSED'
+      status: 'PREPROCESSED',
+      case_id: caseId,
     };
+    // Write to both global fallback and case-scoped key
     localStorage.setItem('pipelineData', JSON.stringify(updatedPayload));
-    navigate('/normalization', { state: { pipelineData: updatedPayload } });
+    if (caseId) {
+      localStorage.setItem(`pipelineData_${caseId}`, JSON.stringify(updatedPayload));
+    }
+    navigate('/normalization', { state: { pipelineData: updatedPayload, caseId } });
   };
 
   const formatHeader = (key) => {

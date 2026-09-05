@@ -42,8 +42,17 @@ export default function Normalization() {
   };
 
   useEffect(() => {
-    // 1. Fetch preprocessed pipeline state
-    const rawData = location.state?.pipelineData || JSON.parse(localStorage.getItem('pipelineData') || '{}');
+    // 1. Extract caseId and fetch from case-scoped key first
+    const caseId = location.state?.caseId;
+    let rawData;
+    if (caseId) {
+      const caseScoped = localStorage.getItem(`pipelineData_${caseId}`);
+      rawData = caseScoped
+        ? JSON.parse(caseScoped)
+        : (location.state?.pipelineData || JSON.parse(localStorage.getItem('pipelineData') || '{}'));
+    } else {
+      rawData = location.state?.pipelineData || JSON.parse(localStorage.getItem('pipelineData') || '{}');
+    }
     setRawPipelineData(rawData);
 
     const records = rawData?.records || rawData?.data || rawData?.items || [];
@@ -134,15 +143,20 @@ export default function Normalization() {
   ];
 
   const handleNextStep = () => {
+    const caseId = location.state?.caseId || rawPipelineData?.case_id;
     const updatedPayload = {
       ...rawPipelineData,
       records: normalizedRecords,
       columns: dynamicColumns,
       files: rawPipelineData?.files || [],
-      status: 'NORMALIZED'
+      status: 'NORMALIZED',
+      case_id: caseId,
     };
     localStorage.setItem('pipelineData', JSON.stringify(updatedPayload));
-    navigate('/enrichment', { state: { pipelineData: updatedPayload } });
+    if (caseId) {
+      localStorage.setItem(`pipelineData_${caseId}`, JSON.stringify(updatedPayload));
+    }
+    navigate('/enrichment', { state: { pipelineData: updatedPayload, caseId } });
   };
 
   const formatHeader = (key) => {

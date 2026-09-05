@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   CheckCircle2,
   Download,
@@ -19,41 +19,94 @@ import html2pdf from 'html2pdf.js';
 export default function Output() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const pdfRef = useRef(null);
 
   const [rawPipelineData, setRawPipelineData] = useState(null);
   const [groupedRecords, setGroupedRecords] = useState({});
   const [isExporting, setIsExporting] = useState(false);
+  const [persistenceStatus, setPersistenceStatus] = useState(null); // 'saved' | 'loaded' | null
 
   useEffect(() => {
-    // Retrieve pipeline payload from route state or browser cache
-    const rawData = location.state?.pipelineData || JSON.parse(localStorage.getItem('pipelineData') || '{}');
+    // --- STAGE 5 PERSISTENCE FIX ---
+    // Resolve caseId from navigate state OR URL query param (?caseId=MG-...)
+    const caseId =
+      location.state?.caseId ||
+      rawPipelineData?.case_id ||
+      searchParams.get('caseId');
+
+    // PRIORITY 1: Try loading already-persisted Stage 5 output for this case (survives refresh)
+    if (caseId) {
+      const stored = localStorage.getItem(`output_${caseId}`);
+      if (stored) {
+        try {
+          const parsedOutput = JSON.parse(stored);
+          setRawPipelineData(parsedOutput);
+          const records = parsedOutput?.records || parsedOutput?.data || parsedOutput?.items || [];
+          const sourceFileName = parsedOutput?.file_name || 'uploaded_data.csv';
+          const grouped = {};
+          records.forEach((record) => {
+            const fileKey =
+              record.source_file || record.fileName || record.file_name ||
+              record.origin_file || sourceFileName;
+            if (!grouped[fileKey]) grouped[fileKey] = [];
+            grouped[fileKey].push(record);
+          });
+          setGroupedRecords(grouped);
+          setPersistenceStatus('loaded');
+          return; // Output loaded from persistent storage — done
+        } catch { /* fall through to fresh data */ }
+      }
+    }
+
+    // PRIORITY 2: Fresh arrival from Enrichment — use pipeline state from route/localStorage
+    const rawData =
+      location.state?.pipelineData ||
+      JSON.parse(localStorage.getItem('pipelineData') || '{}');
+
     setRawPipelineData(rawData);
 
     const records = rawData?.records || rawData?.data || rawData?.items || [];
     const sourceFileName = rawData?.fileName || rawData?.file_name || 'uploaded_data.csv';
+    const resolvedCaseId = caseId || rawData?.case_id;
 
-    // Group records dynamically by source file key
     const grouped = {};
-
     if (records.length > 0) {
       records.forEach((record) => {
         const fileKey =
-          record.source_file ||
-          record.fileName ||
-          record.file_name ||
-          record.origin_file ||
-          sourceFileName;
-
-        if (!grouped[fileKey]) {
-          grouped[fileKey] = [];
-        }
+          record.source_file || record.fileName || record.file_name ||
+          record.origin_file || sourceFileName;
+        if (!grouped[fileKey]) grouped[fileKey] = [];
         grouped[fileKey].push(record);
       });
     }
-
     setGroupedRecords(grouped);
-  }, [location.state]);
+
+    // STAGE 5 PERSISTENCE: Save final output to case-scoped key
+    if (records.length > 0 && resolvedCaseId) {
+      const finalOutput = {
+        ...rawData,
+        output_id: `OUT-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+        case_id: resolvedCaseId,
+        status: 'COMPLETED',
+        completed_at: new Date().toISOString().replace('T', ' ').slice(0, 19),
+        total_records: records.length,
+        pipeline_stages: ['INGESTED', 'PREPROCESSED', 'NORMALIZED', 'ENRICHED', 'COMPLETED'],
+      };
+
+      // Prevent overwriting a COMPLETED output with empty data (idempotent save)
+      const existingOutput = localStorage.getItem(`output_${resolvedCaseId}`);
+      if (!existingOutput) {
+        localStorage.setItem(`output_${resolvedCaseId}`, JSON.stringify(finalOutput));
+        // Also update the global pipelineData with COMPLETED status
+        localStorage.setItem('pipelineData', JSON.stringify(finalOutput));
+        if (resolvedCaseId) {
+          localStorage.setItem(`pipelineData_${resolvedCaseId}`, JSON.stringify(finalOutput));
+        }
+        setPersistenceStatus('saved');
+      }
+    }
+  }, [location.state, searchParams]);
 
   const workflowSteps = [
     { step: 1, title: 'Ingestion', sub: 'Collect data', path: '/datasources' },
@@ -193,6 +246,24 @@ export default function Output() {
               <span>{isExporting ? 'Generating PDF...' : 'Export PDF Report'}</span>
             </button>
           </div>
+
+          {/* Persistence status banner */}
+          {persistenceStatus === 'saved' && (
+            <div className="flex items-center space-x-2 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-2.5">
+              <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span className="text-xs font-semibold text-emerald-800">
+                Stage 5 output saved — Case <span className="font-mono">{rawPipelineData?.case_id}</span> — {rawPipelineData?.total_records} records persisted. Survives refresh and browser restart.
+              </span>
+            </div>
+          )}
+          {persistenceStatus === 'loaded' && (
+            <div className="flex items-center space-x-2 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-2.5">
+              <Database className="w-4 h-4 text-indigo-600 shrink-0" />
+              <span className="text-xs font-semibold text-indigo-800">
+                Output loaded from persistent storage — Case <span className="font-mono">{rawPipelineData?.case_id}</span> — completed at {rawPipelineData?.completed_at}
+              </span>
+            </div>
+          )}
 
           {/* Workflow Stepper */}
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">

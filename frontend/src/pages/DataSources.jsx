@@ -292,7 +292,10 @@ export default function DataSource() {
       }
 
       setUploadProgress(100);
-      localStorage.setItem('pipelineData', JSON.stringify(result));
+      // Persist to global fallback key AND case-scoped key
+      const resultWithCase = { ...result, case_id: activeCaseId, status: 'INGESTED' };
+      localStorage.setItem('pipelineData', JSON.stringify(resultWithCase));
+      localStorage.setItem(`pipelineData_${activeCaseId}`, JSON.stringify(resultWithCase));
 
       // Persist file metadata for this case in localStorage
       const newFileEntries = selectedFiles.map((file) => ({
@@ -304,6 +307,7 @@ export default function DataSource() {
         case_id: activeCaseId,
         source_type: formData.sourceType,
         source_org: formData.sourceOrg,
+        processing_status: 'INGESTED',
       }));
       const storageKey = `muleguard_files_${activeCaseId}`;
       const existing = JSON.parse(localStorage.getItem(storageKey) || '[]');
@@ -314,7 +318,8 @@ export default function DataSource() {
       setTimeout(() => {
         setIsUploading(false);
         setSelectedFiles([]);
-        navigate('/preprocessing', { state: { pipelineData: result } });
+        // Pass caseId through navigate state so all downstream stages can propagate it
+        navigate('/preprocessing', { state: { pipelineData: resultWithCase, caseId: activeCaseId } });
       }, 500);
 
     } catch (error) {
@@ -332,6 +337,7 @@ export default function DataSource() {
       };
 
       localStorage.setItem('pipelineData', JSON.stringify(fallbackPayload));
+      localStorage.setItem(`pipelineData_${activeCaseId}`, JSON.stringify(fallbackPayload));
 
       // Persist file metadata even on backend failure (fallback)
       const fallbackFileEntries = selectedFiles.map((file) => ({
@@ -343,6 +349,7 @@ export default function DataSource() {
         case_id: activeCaseId,
         source_type: formData.sourceType,
         source_org: formData.sourceOrg,
+        processing_status: 'INGESTED',
       }));
       const fallbackKey = `muleguard_files_${activeCaseId}`;
       const fallbackExisting = JSON.parse(localStorage.getItem(fallbackKey) || '[]');
@@ -352,7 +359,7 @@ export default function DataSource() {
 
       setIsUploading(false);
       setUploadProgress(0);
-      navigate('/preprocessing', { state: { pipelineData: fallbackPayload } });
+      navigate('/preprocessing', { state: { pipelineData: fallbackPayload, caseId: activeCaseId } });
     }
   };
 

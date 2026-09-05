@@ -45,8 +45,17 @@ export default function Enrichment() {
   };
 
   useEffect(() => {
-    // 1. Retrieve raw/normalized pipeline state safely
-    const rawData = location.state?.pipelineData || JSON.parse(localStorage.getItem('pipelineData') || '{}');
+    // 1. Extract caseId and retrieve normalized pipeline state from case-scoped key
+    const caseId = location.state?.caseId;
+    let rawData;
+    if (caseId) {
+      const caseScoped = localStorage.getItem(`pipelineData_${caseId}`);
+      rawData = caseScoped
+        ? JSON.parse(caseScoped)
+        : (location.state?.pipelineData || JSON.parse(localStorage.getItem('pipelineData') || '{}'));
+    } else {
+      rawData = location.state?.pipelineData || JSON.parse(localStorage.getItem('pipelineData') || '{}');
+    }
     setRawPipelineData(rawData);
 
     const records = rawData?.records || rawData?.data || rawData?.items || [];
@@ -155,6 +164,7 @@ export default function Enrichment() {
   ];
 
   const handleNextStep = () => {
+    const caseId = location.state?.caseId || rawPipelineData?.case_id;
     const updatedPayload = {
       ...rawPipelineData,
       records: enrichedRecords,
@@ -166,10 +176,14 @@ export default function Enrichment() {
         keywords: Array.from(extractedEntities.keywords)
       },
       files: rawPipelineData?.files || [],
-      status: 'ENRICHED'
+      status: 'ENRICHED',
+      case_id: caseId,
     };
     localStorage.setItem('pipelineData', JSON.stringify(updatedPayload));
-    navigate('/output', { state: { pipelineData: updatedPayload } });
+    if (caseId) {
+      localStorage.setItem(`pipelineData_${caseId}`, JSON.stringify(updatedPayload));
+    }
+    navigate('/output', { state: { pipelineData: updatedPayload, caseId } });
   };
 
   const formatHeader = (key) => {
