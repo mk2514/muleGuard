@@ -1,96 +1,29 @@
-import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   CheckCircle2,
-  Filter,
-  RefreshCw,
   ArrowRight,
+  Sparkles,
   Search,
   Bell,
   ChevronDown,
+  Filter,
+  RefreshCw,
+  SlidersHorizontal,
+  Check,
   Zap,
+  Clock,
   ArrowLeft,
   AlertTriangle,
-  CheckCircle,
   Table as TableIcon
 } from 'lucide-react';
 
 export default function Preprocessing() {
-  const location = useLocation();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const [rawPipelineData, setRawPipelineData] = useState(null);
-  const [processedRecords, setProcessedRecords] = useState([]);
-  const [removedRecords, setRemovedRecords] = useState([]);
-  const [dynamicColumns, setDynamicColumns] = useState([]);
-  const [isProcessing, setIsProcessing] = useState(true);
-
-  useEffect(() => {
-    // 1. Retrieve real backend payload from navigation state or localStorage
-    const rawData = location.state?.pipelineData || JSON.parse(localStorage.getItem('pipelineData') || '{}');
-    setRawPipelineData(rawData);
-
-    // Extract dynamic dataset array (supports 'data', 'records', or 'processed_data')
-    const rawRecords = rawData?.data || rawData?.records || rawData?.processed_data || [];
-
-    setIsProcessing(true);
-
-    setTimeout(() => {
-      if (rawRecords.length > 0) {
-        // 2. DYNAMIC COLUMN DISCOVERY: Extract every unique key across all records
-        const discoveredKeys = new Set();
-        rawRecords.forEach((item) => {
-          if (item && typeof item === 'object') {
-            // Include raw row keys as well as nested keys if present
-            Object.keys(item).forEach((key) => {
-              if (key !== 'evidence' && key !== 'rawItem') {
-                discoveredKeys.add(key);
-              }
-            });
-          }
-        });
-
-        const columnList = Array.from(discoveredKeys);
-        setDynamicColumns(columnList);
-
-        // 3. Process records without dropping unmapped fields
-        const clean = [];
-        const dirty = [];
-
-        rawRecords.forEach((item, index) => {
-          // Check for empty/corrupt records
-          const hasData = Object.values(item).some(
-            (val) => val !== null && val !== undefined && String(val).trim() !== ''
-          );
-
-          if (!hasData) {
-            dirty.push({
-              _id: item.event_id || item.id || `#${index + 1}`,
-              _reason: 'Empty / Null Record',
-              ...item
-            });
-          } else {
-            // AFTER (In Preprocessing.jsx)
-clean.push({
-  _id: item.event_id || item.id || item.chat_id || `#${index + 1}`,
-  source_file: item.source_file || item.fileName || item.file_name || rawData.fileName || 'file_1.csv',
-  ...item
-});
-          }
-        });
-
-        setProcessedRecords(clean);
-        setRemovedRecords(dirty);
-      } else {
-        setProcessedRecords([]);
-        setRemovedRecords([]);
-        setDynamicColumns([]);
-      }
-
-      setIsProcessing(false);
-    }, 300);
-  }, [location.state]);
-
+  // Workflow Pipeline Tracking
+  const activeStep = 2;
   const workflowSteps = [
     { step: 1, title: 'Ingestion', sub: 'Collect data', path: '/datasources' },
     { step: 2, title: 'Preprocessing', sub: 'Clean & standardize', path: '/preprocessing' },
@@ -99,19 +32,187 @@ clean.push({
     { step: 5, title: 'Output', sub: 'Ready for analysis', path: '/dashboard' },
   ];
 
-  const handleNextStep = () => {
-  const updatedPayload = {
-    ...rawPipelineData,
-    records: processedRecords,
-    columns: dynamicColumns,
-    files: rawPipelineData?.files || [], // Preserves the array of uploaded file metadata
-    status: 'PREPROCESSED'
-  };
-  localStorage.setItem('pipelineData', JSON.stringify(updatedPayload));
-  navigate('/normalization', { state: { pipelineData: updatedPayload } });
-};
+  // Raw Pipeline Context & Processing States
+  const [rawPipelineData, setRawPipelineData] = useState(null);
+  const [rawRecords, setRawRecords] = useState([]);
+  const [dynamicColumns, setDynamicColumns] = useState([]);
+  
+  const [cleanOptions, setCleanOptions] = useState({
+    removeNulls: true,
+    stripWhitespace: true,
+    standardizePhoneFormat: true,
+    filterCorruptedRows: true,
+    autoDeduplicate: true,
+  });
 
-  // Helper to format key headers into readable labels
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processedStatus, setProcessedStatus] = useState(false);
+  const [executionTime, setExecutionTime] = useState(0);
+
+  // 1. Retrieve Payload and Discover All Dynamic Keys Across Any Input
+  useEffect(() => {
+    const rawData = location.state?.pipelineData || JSON.parse(localStorage.getItem('pipelineData') || '{}');
+    setRawPipelineData(rawData);
+
+    // Extract dynamic array from backend/ingestion payload (supports multiple key conventions)
+    const records = rawData?.data || rawData?.records || rawData?.processed_data || [];
+    setRawRecords(records);
+
+    if (records.length > 0) {
+      const discoveredKeys = new Set();
+      records.forEach((item) => {
+        if (item && typeof item === 'object') {
+          Object.keys(item).forEach((key) => {
+            if (!['_id', '_reason', 'rawItem', 'evidence'].includes(key)) {
+              discoveredKeys.add(key);
+            }
+          });
+        }
+      });
+      setDynamicColumns(Array.from(discoveredKeys));
+    }
+  }, [location.state]);
+
+  // 2. Dynamic Cleaning Engine Logic
+  const { processedRecords, removedRecords, stats } = useMemo(() => {
+    const startTime = performance.now();
+    
+    if (!rawRecords || rawRecords.length === 0) {
+      return { 
+        processedRecords: [], 
+        removedRecords: [], 
+        stats: { total: 0, nulls: 0, corrupted: 0, duplicates: 0 } 
+      };
+    }
+
+    const clean = [];
+    const dirty = [];
+    const seenHashes = new Set();
+
+    let nullCount = 0;
+    let corruptedCount = 0;
+    let duplicateCount = 0;
+
+    rawRecords.forEach((item, index) => {
+      let currentItem = { ...item };
+      let isCorrupted = false;
+      let isNullOrEmpty = false;
+
+      // Rule A: Check for Completely Empty / Null Values
+      const values = Object.values(currentItem);
+      const hasValidData = values.some((val) => val !== null && val !== undefined && String(val).trim() !== '');
+
+      if (!hasValidData) {
+        isNullOrEmpty = true;
+        nullCount++;
+      }
+
+      // Rule B: Trim Whitespace and Handle Strings
+      if (cleanOptions.stripWhitespace) {
+        Object.keys(currentItem).forEach((k) => {
+          if (typeof currentItem[k] === 'string') {
+            currentItem[k] = currentItem[k].trim().replace(/\s+/g, ' ');
+          }
+        });
+      }
+
+      // Rule C: Standardize Phone Number Formats to E.164 (+91 format for India)
+      if (cleanOptions.standardizePhoneFormat) {
+        Object.keys(currentItem).forEach((k) => {
+          if (/phone|mobile|caller|receiver|contact|num/i.test(k) && currentItem[k]) {
+            let str = String(currentItem[k]).replace(/[^\d+]/g, '');
+            if (str.length === 10) {
+              str = `+91${str}`;
+            } else if (str.startsWith('0') && str.length === 11) {
+              str = `+91${str.slice(1)}`;
+            } else if (str.length === 12 && str.startsWith('91')) {
+              str = `+${str}`;
+            }
+            currentItem[k] = str;
+          }
+        });
+      }
+
+      // Rule D: Detect Syntax Corruption
+      if (typeof item !== 'object' || item === null) {
+        isCorrupted = true;
+        corruptedCount++;
+      }
+
+      // Rule E: Deduplicate Unique Event Signatures
+      const rowHash = JSON.stringify(currentItem);
+      if (cleanOptions.autoDeduplicate && seenHashes.has(rowHash)) {
+        duplicateCount++;
+        dirty.push({
+          _id: currentItem.event_id || currentItem.id || `#${index + 1}`,
+          _reason: 'Duplicate Entry',
+          ...currentItem
+        });
+        return;
+      }
+
+      // Routing logic based on user toggle configurations
+      if (cleanOptions.removeNulls && isNullOrEmpty) {
+        dirty.push({
+          _id: currentItem.event_id || currentItem.id || `#${index + 1}`,
+          _reason: 'Missing Core Data',
+          ...currentItem
+        });
+      } else if (cleanOptions.filterCorruptedRows && isCorrupted) {
+        dirty.push({
+          _id: `#${index + 1}`,
+          _reason: 'Corrupted Syntax',
+          ...currentItem
+        });
+      } else {
+        seenHashes.add(rowHash);
+        clean.push({
+          _id: currentItem.event_id || currentItem.id || currentItem.chat_id || `#${index + 1}`,
+          source_file: currentItem.source_file || currentItem.fileName || rawPipelineData?.fileName || 'ingested_file.csv',
+          ...currentItem
+        });
+      }
+    });
+
+    const endTime = performance.now();
+    setExecutionTime(((endTime - startTime) / 1000).toFixed(2));
+
+    return {
+      processedRecords: clean,
+      removedRecords: dirty,
+      stats: {
+        total: rawRecords.length,
+        nulls: nullCount,
+        corrupted: corruptedCount,
+        duplicates: duplicateCount,
+      }
+    };
+  }, [rawRecords, cleanOptions, rawPipelineData]);
+
+  const handleToggle = (key) => {
+    setCleanOptions((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleRunPreprocessing = () => {
+    setIsProcessing(true);
+    setTimeout(() => {
+      setIsProcessing(false);
+      setProcessedStatus(true);
+    }, 600);
+  };
+
+  const handleProceedToNormalization = () => {
+    const updatedPayload = {
+      ...rawPipelineData,
+      records: processedRecords,
+      columns: dynamicColumns,
+      files: rawPipelineData?.files || [],
+      status: 'PREPROCESSED'
+    };
+    localStorage.setItem('pipelineData', JSON.stringify(updatedPayload));
+    navigate('/normalization', { state: { pipelineData: updatedPayload } });
+  };
+
   const formatHeader = (key) => {
     return key
       .replace(/_/g, ' ')
@@ -119,7 +220,6 @@ clean.push({
       .toUpperCase();
   };
 
-  // Helper to safely render complex cell values (arrays, objects, primitives)
   const renderCellValue = (value) => {
     if (value === null || value === undefined || value === '') {
       return <span className="text-slate-300 font-mono">N/A</span>;
@@ -134,20 +234,29 @@ clean.push({
     <div className="flex h-screen bg-slate-50 font-sans text-slate-800">
       <div className="flex-1 flex flex-col overflow-y-auto">
         
-        {/* Top Header */}
+        {/* Top Header Bar */}
         <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-10">
           <div className="flex items-center space-x-4">
             <div className="relative w-80">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search cases, entities, files..."
+                placeholder="Search raw pipeline fields..."
                 className="w-full pl-9 pr-4 py-1.5 bg-slate-100 border-none rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
           </div>
 
-          <div className="flex items-center space-x-6">
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => navigate('/enrichment')}
+              className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold text-xs rounded-lg shadow-sm flex items-center space-x-2 transition-all"
+            >
+              <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+              <span>Jump to Enrichment</span>
+              <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            </button>
+
             <div className="flex items-center space-x-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
               <span className="text-xs font-semibold text-slate-500">Case ID:</span>
               <span className="text-sm font-bold text-indigo-900">MG-2024-1024</span>
@@ -173,19 +282,32 @@ clean.push({
           </div>
         </header>
 
-        {/* Content Body */}
+        {/* Main Content Body */}
         <div className="p-6 space-y-6">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Dynamic Preprocessing Engine</h1>
-            <p className="text-sm text-slate-500 mt-0.5">Automated field discovery, schema adaptation, and structure normalization</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Dynamic Preprocessing Engine</h1>
+              <p className="text-sm text-slate-500 mt-0.5">Automated field discovery, schema cleaning, and structure validation</p>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={handleProceedToNormalization}
+                disabled={processedRecords.length === 0}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg flex items-center space-x-2 shadow-sm disabled:opacity-50"
+              >
+                <span>Proceed to Step 3 (Normalization)</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
 
           {/* Workflow Stepper */}
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between max-w-5xl mx-auto">
               {workflowSteps.map((s, idx) => {
-                const isActive = s.step === 2;
-                const isPassed = s.step < 2;
+                const isActive = activeStep === s.step;
+                const isPassed = activeStep > s.step;
 
                 return (
                   <React.Fragment key={s.step}>
@@ -213,7 +335,9 @@ clean.push({
                     </button>
 
                     {idx < workflowSteps.length - 1 && (
-                      <div className={`h-[2px] flex-1 mx-4 ${isPassed ? 'bg-emerald-500' : 'bg-slate-200'}`} />
+                      <div className={`h-[2px] flex-1 mx-4 transition-colors ${
+                        activeStep > s.step ? 'bg-emerald-500' : 'bg-slate-200'
+                      }`} />
                     )}
                   </React.Fragment>
                 );
@@ -221,145 +345,211 @@ clean.push({
             </div>
           </div>
 
-          {/* Metrics Overview */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-4">
-              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-600 rounded-xl">
-                <CheckCircle className="h-6 w-6" />
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 font-semibold">Loaded Records</p>
-                <p className="text-xl font-bold text-slate-900 mt-0.5">{processedRecords.length} Entries</p>
-                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded mt-1 inline-block">
-                  All Fields Extracted
-                </span>
-              </div>
-            </div>
+          {/* Grid Layout */}
+          <div className="grid grid-cols-12 gap-6">
 
-            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-4">
-              <div className="p-3 bg-indigo-50 border border-indigo-200 text-indigo-600 rounded-xl">
-                <TableIcon className="h-6 w-6" />
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 font-semibold">Discovered Schema Fields</p>
-                <p className="text-xl font-bold text-slate-900 mt-0.5">{dynamicColumns.length} Attributes</p>
-                <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded mt-1 inline-block">
-                  Auto-Mapped
-                </span>
-              </div>
-            </div>
-
-            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-4">
-              <div className="p-3 bg-amber-50 border border-amber-200 text-amber-600 rounded-xl">
-                <Filter className="h-6 w-6" />
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 font-semibold">Dataset Classification</p>
-                <p className="text-xl font-bold text-slate-900 mt-0.5 uppercase">
-                  {rawPipelineData?.detected_type || 'UNSTRUCTURED'}
-                </p>
-                <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded mt-1 inline-block">
-                  {isProcessing ? 'Analyzing...' : 'Ready for Normalization'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Dynamic Data Table */}
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-bold text-slate-900 flex items-center space-x-2">
-                <Zap className="h-5 w-5 text-indigo-600" />
-                <span>Live Discovered Field Matrix</span>
-              </h3>
-              {isProcessing && (
-                <span className="text-xs text-indigo-600 font-bold flex items-center space-x-1 animate-pulse">
-                  <RefreshCw className="w-3 h-3 animate-spin mr-1" /> Reading all dataset attributes...
-                </span>
-              )}
-            </div>
-
-            <div className="overflow-x-auto">
-              {processedRecords.length > 0 ? (
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
-                      <th className="p-3 sticky left-0 bg-slate-100 z-10 border-r border-slate-200">#</th>
-                      {dynamicColumns.map((col) => (
-                        <th key={col} className="p-3 whitespace-nowrap min-w-[120px]">
-                          {formatHeader(col)}
-                        </th>
-                      ))}
-                      <th className="p-3">STATUS</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {processedRecords.map((row, idx) => (
-                      <tr key={row._id || idx} className="hover:bg-slate-50 transition">
-                        <td className="p-3 font-bold text-slate-500 font-mono sticky left-0 bg-white border-r border-slate-100 z-10">
-                          {row._id}
-                        </td>
-                        {dynamicColumns.map((col) => (
-                          <td key={col} className="p-3 text-slate-800 max-w-xs truncate font-mono">
-                            {renderCellValue(row[col])}
-                          </td>
-                        ))}
-                        <td className="p-3 whitespace-nowrap">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                            <CheckCircle className="w-3 h-3 mr-1" /> Valid
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-
-                    {removedRecords.map((row, idx) => (
-                      <tr key={`dirty-${idx}`} className="bg-amber-50/40 hover:bg-amber-50 transition">
-                        <td className="p-3 font-bold text-slate-400 font-mono sticky left-0 bg-amber-50 border-r border-slate-200 z-10">
-                          {row._id}
-                        </td>
-                        {dynamicColumns.map((col) => (
-                          <td key={col} className="p-3 text-slate-400 max-w-xs truncate font-mono line-through">
-                            {renderCellValue(row[col])}
-                          </td>
-                        ))}
-                        <td className="p-3 whitespace-nowrap">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
-                            <AlertTriangle className="w-3 h-3 mr-1" /> {row._reason}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <div className="py-12 text-center text-slate-400">
-                  <p className="text-sm font-semibold">No data records found in backend payload.</p>
-                  <p className="text-xs mt-1">Please return to Ingestion (Step 1) and upload a CSV/JSON file.</p>
+            {/* Left Controls Column */}
+            <div className="col-span-12 lg:col-span-4 space-y-6">
+              
+              {/* Dataset Health Overview Card */}
+              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <h2 className="text-sm font-bold text-slate-900 flex items-center space-x-2">
+                    <Filter className="w-4 h-4 text-indigo-600" />
+                    <span>Raw Ingested Dataset Health</span>
+                  </h2>
+                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    {stats.total.toLocaleString()} Records
+                  </span>
                 </div>
-              )}
+
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-amber-50 border border-amber-200 p-2.5 rounded-lg">
+                    <p className="text-base font-bold text-amber-700">{stats.nulls}</p>
+                    <p className="text-[10px] font-semibold text-amber-900 mt-0.5">Null / Empty</p>
+                  </div>
+                  <div className="bg-red-50 border border-red-200 p-2.5 rounded-lg">
+                    <p className="text-base font-bold text-red-700">{stats.corrupted}</p>
+                    <p className="text-[10px] font-semibold text-red-900 mt-0.5">Malformed</p>
+                  </div>
+                  <div className="bg-blue-50 border border-blue-200 p-2.5 rounded-lg">
+                    <p className="text-base font-bold text-blue-700">{stats.duplicates}</p>
+                    <p className="text-[10px] font-semibold text-blue-900 mt-0.5">Duplicates</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic Rules Configuration Card */}
+              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                <h2 className="text-sm font-bold text-slate-900 flex items-center space-x-2 border-b border-slate-100 pb-2">
+                  <SlidersHorizontal className="w-4 h-4 text-indigo-600" />
+                  <span>Cleaning Toggles</span>
+                </h2>
+
+                <div className="space-y-3">
+                  {[
+                    { key: 'removeNulls', label: 'Strip Null & Empty Values', desc: 'Isolate entries missing mandatory attributes' },
+                    { key: 'stripWhitespace', label: 'Trim Whitespace & Format Strings', desc: 'Remove leading/trailing spaces and multi-spaces' },
+                    { key: 'standardizePhoneFormat', label: 'Standardize Phone Numbers (+91)', desc: 'Auto-format phone keys into international E.164 standard' },
+                    { key: 'autoDeduplicate', label: 'Deduplicate Equivalent Records', desc: 'Merge and discard identical raw event rows' },
+                    { key: 'filterCorruptedRows', label: 'Quarantine Malformed Rows', desc: 'Filter out unparseable object shapes' },
+                  ].map((rule) => (
+                    <div 
+                      key={rule.key} 
+                      onClick={() => handleToggle(rule.key)}
+                      className={`p-3 rounded-lg border cursor-pointer transition-all flex items-start justify-between ${
+                        cleanOptions[rule.key] 
+                          ? 'bg-indigo-50/60 border-indigo-200' 
+                          : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <div className="pr-3">
+                        <p className="text-xs font-bold text-slate-800">{rule.label}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">{rule.desc}</p>
+                      </div>
+                      <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 mt-0.5 border ${
+                        cleanOptions[rule.key] ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300 bg-white'
+                      }`}>
+                        {cleanOptions[rule.key] && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    onClick={handleRunPreprocessing}
+                    disabled={isProcessing || rawRecords.length === 0}
+                    className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg shadow-sm flex items-center justify-center space-x-2 disabled:opacity-50"
+                  >
+                    {isProcessing ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Applying Cleaning Rules...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-4 h-4 text-amber-300" />
+                        <span>Re-Apply Preprocessing Engine</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
             </div>
 
-            {/* Step Controls */}
-            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-              <button 
-                onClick={() => navigate('/datasources')}
-                className="px-4 py-2 bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-200 flex items-center space-x-1"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                <span>Back to Ingestion</span>
-              </button>
+            {/* Right Live Preview Column */}
+            <div className="col-span-12 lg:col-span-8 space-y-6">
+              
+              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center space-x-2">
+                    <TableIcon className="w-4 h-4 text-indigo-600" />
+                    <h3 className="text-sm font-bold text-slate-900">Live Processed Output Matrix</h3>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200 flex items-center space-x-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>{processedRecords.length} Clean Records Ready</span>
+                    </span>
+                    <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-200">
+                      {dynamicColumns.length} Discovered Fields
+                    </span>
+                  </div>
+                </div>
 
-              <button 
-                onClick={handleNextStep}
-                disabled={isProcessing || processedRecords.length === 0}
-                className="px-6 py-2.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 shadow-sm flex items-center space-x-2 disabled:opacity-50"
-              >
-                <span>Proceed to Normalization (Step 3)</span>
-                <ArrowRight className="h-4 w-4" />
-              </button>
+                <div className="overflow-x-auto border border-slate-200 rounded-lg max-h-[420px]">
+                  {rawRecords.length > 0 ? (
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200 sticky top-0 z-10">
+                          <th className="p-2.5 sticky left-0 bg-slate-100 z-20 border-r border-slate-200"># ID</th>
+                          {dynamicColumns.map((col) => (
+                            <th key={col} className="p-2.5 whitespace-nowrap min-w-[130px]">
+                              {formatHeader(col)}
+                            </th>
+                          ))}
+                          <th className="p-2.5">STATUS</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {/* Valid Processed Records */}
+                        {processedRecords.map((row, idx) => (
+                          <tr key={row._id || idx} className="hover:bg-slate-50 transition">
+                            <td className="p-2.5 font-bold text-slate-500 font-mono sticky left-0 bg-white border-r border-slate-100 z-10">
+                              {row._id}
+                            </td>
+                            {dynamicColumns.map((col) => (
+                              <td key={col} className="p-2.5 text-slate-800 max-w-xs truncate font-mono">
+                                {renderCellValue(row[col])}
+                              </td>
+                            ))}
+                            <td className="p-2.5 whitespace-nowrap">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                <CheckCircle2 className="w-3 h-3 mr-1" /> Clean
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+
+                        {/* Quarantined Records */}
+                        {removedRecords.map((row, idx) => (
+                          <tr key={`dirty-${idx}`} className="bg-amber-50/40 hover:bg-amber-50 transition">
+                            <td className="p-2.5 font-bold text-slate-400 font-mono sticky left-0 bg-amber-50 border-r border-slate-200 z-10">
+                              {row._id}
+                            </td>
+                            {dynamicColumns.map((col) => (
+                              <td key={col} className="p-2.5 text-slate-400 max-w-xs truncate font-mono line-through">
+                                {renderCellValue(row[col])}
+                              </td>
+                            ))}
+                            <td className="p-2.5 whitespace-nowrap">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
+                                <AlertTriangle className="w-3 h-3 mr-1" /> {row._reason}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="py-16 text-center text-slate-400">
+                      <p className="text-sm font-semibold">No active data stream in pipeline memory.</p>
+                      <p className="text-xs mt-1">Go back to Ingestion (Step 1) to upload a file.</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Status Bar */}
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between text-xs text-slate-600">
+                  <div className="flex items-center space-x-2">
+                    <Clock className="w-4 h-4 text-slate-400" />
+                    <span>Real-time execution latency: <strong>{executionTime}s</strong></span>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <button 
+                      onClick={() => navigate('/datasources')}
+                      className="font-bold text-slate-500 hover:text-slate-800 flex items-center space-x-1"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      <span>Back to Ingestion</span>
+                    </button>
+                    <button 
+                      onClick={handleProceedToNormalization}
+                      disabled={processedRecords.length === 0}
+                      className="font-bold text-indigo-600 hover:text-indigo-800 hover:underline flex items-center space-x-1 disabled:opacity-50"
+                    >
+                      <span>Proceed to Normalization</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
             </div>
+
           </div>
-
         </div>
 
       </div>

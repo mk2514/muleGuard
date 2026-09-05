@@ -30,12 +30,26 @@ export default function Enrichment() {
   const [dynamicColumns, setDynamicColumns] = useState([]);
   const [isProcessing, setIsProcessing] = useState(true);
 
+  // Helper function to extract text recursively across arbitrary nested data shapes
+  const extractAllStrings = (obj) => {
+    if (obj === null || obj === undefined) return '';
+    if (typeof obj === 'string' || typeof obj === 'number' || typeof obj === 'boolean') {
+      return String(obj) + ' ';
+    }
+    if (typeof obj === 'object') {
+      return Object.values(obj)
+        .map((val) => extractAllStrings(val))
+        .join(' ');
+    }
+    return '';
+  };
+
   useEffect(() => {
-    // 1. Retrieve normalized data from location state or localStorage
+    // 1. Retrieve raw/normalized pipeline state safely
     const rawData = location.state?.pipelineData || JSON.parse(localStorage.getItem('pipelineData') || '{}');
     setRawPipelineData(rawData);
 
-    const records = rawData?.records || rawData?.data || [];
+    const records = rawData?.records || rawData?.data || rawData?.items || [];
 
     setIsProcessing(true);
 
@@ -43,19 +57,32 @@ export default function Enrichment() {
       if (records.length > 0) {
         // Dynamic Column Discovery
         const discoveredKeys = new Set(['event_id', 'extracted_entities', 'risk_score']);
-        
+
         const ipSet = new Set();
         const upiSet = new Set();
         const phoneSet = new Set();
         const keywordSet = new Set();
 
-        // Entity Regex Patterns
+        // Comprehensive Entity Regex Patterns
         const ipRegex = /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/g;
         const upiRegex = /[a-zA-Z0-9.\-_]+@[a-zA-Z]{2,}/g;
-        const phoneRegex = /\+?[0-9]{10,12}/g;
-        const highRiskTerms = ['crypto', 'usdt', 'mule', 'commission', 'withdrawal', 'delete', 'transfer', 'upi', 'cash'];
+        const phoneRegex = /(?:\+91|91)?[\s-]?[6-9]\d{9}\b|\+?[0-9]{10,12}\b/g;
+        const highRiskTerms = [
+          'crypto',
+          'usdt',
+          'mule',
+          'commission',
+          'withdrawal',
+          'delete',
+          'transfer',
+          'upi',
+          'cash',
+          'fraud',
+          'phishing',
+          'gambling'
+        ];
 
-        // 2. Perform AI / Heuristic Enrichment across all fields
+        // 2. Perform Heuristic / NLP Enrichment across all dynamic fields
         const processed = records.map((item, index) => {
           Object.keys(item).forEach((k) => {
             if (!['_id', 'rawItem', 'evidence'].includes(k)) {
@@ -63,35 +90,41 @@ export default function Enrichment() {
             }
           });
 
-          // Convert entire row content into search text for entity extraction
-          const rowText = Object.values(item).map(v => String(v)).join(' ');
+          // Recursively combine row contents into unified text stream
+          const rowText = extractAllStrings(item);
 
-          // Extract Entities
-          const foundIPs = rowText.match(ipRegex) || [];
-          const foundUPIs = rowText.match(upiRegex) || [];
-          const foundPhones = rowText.match(phoneRegex) || [];
-          const foundKeywords = highRiskTerms.filter(term => rowText.toLowerCase().includes(term));
+          // Extract Entities dynamically
+          const foundIPs = Array.from(new Set(rowText.match(ipRegex) || []));
+          const foundUPIs = Array.from(new Set(rowText.match(upiRegex) || []));
+          const foundPhones = Array.from(new Set(rowText.match(phoneRegex) || []));
+          const foundKeywords = highRiskTerms.filter((term) =>
+            rowText.toLowerCase().includes(term.toLowerCase())
+          );
 
-          foundIPs.forEach(ip => ipSet.add(ip));
-          foundUPIs.forEach(upi => upiSet.add(upi));
-          foundPhones.forEach(ph => phoneSet.add(ph));
-          foundKeywords.forEach(kw => keywordSet.add(kw));
+          foundIPs.forEach((ip) => ipSet.add(ip));
+          foundUPIs.forEach((upi) => upiSet.add(upi));
+          foundPhones.forEach((ph) => phoneSet.add(ph));
+          foundKeywords.forEach((kw) => keywordSet.add(kw));
 
-          // Calculate Dynamic Risk Score
-          let riskScore = 15; // Baseline
-          if (foundKeywords.length > 0) riskScore += foundKeywords.length * 25;
-          if (foundIPs.length > 0) riskScore += 20;
+          // Compute Dynamic Threat Risk Rating
+          let riskScore = 15; // Baseline risk
+          if (foundKeywords.length > 0) riskScore += foundKeywords.length * 20;
+          if (foundIPs.length > 0) riskScore += 15;
           if (foundUPIs.length > 0) riskScore += 15;
+          if (foundPhones.length > 0) riskScore += 10;
           if (riskScore > 99) riskScore = 99;
+
+          const dynamicEntitiesList = [
+            ...foundIPs.map((i) => `IP: ${i}`),
+            ...foundUPIs.map((u) => `UPI: ${u}`),
+            ...foundPhones.map((p) => `TEL: ${p}`),
+            ...foundKeywords.map((k) => `TAG: ${k.toUpperCase()}`)
+          ];
 
           return {
             ...item,
-            event_id: item.event_id || item.id || `ENRICH-${index + 1}`,
-            extracted_entities: [
-              ...foundIPs.map(i => `IP: ${i}`),
-              ...foundUPIs.map(u => `UPI: ${u}`),
-              ...foundKeywords.map(k => `TAG: ${k.toUpperCase()}`)
-            ].join(', ') || 'NONE_DETECTED',
+            event_id: item.event_id || item.id || item._id || `ENRICH-${index + 1}`,
+            extracted_entities: dynamicEntitiesList.length > 0 ? dynamicEntitiesList.join(', ') : 'NONE_DETECTED',
             risk_score: `${riskScore}%`
           };
         });
@@ -118,7 +151,7 @@ export default function Enrichment() {
     { step: 2, title: 'Preprocessing', sub: 'Clean & standardize', path: '/preprocessing' },
     { step: 3, title: 'Normalization', sub: 'Unify formats', path: '/normalization' },
     { step: 4, title: 'Enrichment', sub: 'Extract entities', path: '/enrichment' },
-    { step: 5, title: 'Output', sub: 'Ready for analysis', path: '/dashboard' },
+    { step: 5, title: 'Output', sub: 'Ready for analysis', path: '/dashboard' }
   ];
 
   const handleNextStep = () => {
@@ -132,11 +165,11 @@ export default function Enrichment() {
         phones: Array.from(extractedEntities.phones),
         keywords: Array.from(extractedEntities.keywords)
       },
+      files: rawPipelineData?.files || [],
       status: 'ENRICHED'
     };
     localStorage.setItem('pipelineData', JSON.stringify(updatedPayload));
     navigate('/output', { state: { pipelineData: updatedPayload } });
-
   };
 
   const formatHeader = (key) => {
@@ -173,10 +206,22 @@ export default function Enrichment() {
             </div>
           </div>
 
-          <div className="flex items-center space-x-6">
+          <div className="flex items-center space-x-4">
+            {/* TOP NEXT PROCESS BUTTON */}
+            <button
+              onClick={handleNextStep}
+              disabled={isProcessing || enrichedRecords.length === 0}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-lg shadow-sm flex items-center space-x-2 transition-all disabled:opacity-50"
+            >
+              <span>Proceed to Step 5 (Output)</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+
             <div className="flex items-center space-x-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
               <span className="text-xs font-semibold text-slate-500">Case ID:</span>
-              <span className="text-sm font-bold text-indigo-900">MG-2024-1024</span>
+              <span className="text-sm font-bold text-indigo-900">
+                {rawPipelineData?.case_id || 'MG-2024-1024'}
+              </span>
               <ChevronDown className="h-4 w-4 text-slate-400" />
             </div>
 
@@ -201,9 +246,21 @@ export default function Enrichment() {
 
         {/* Content Body */}
         <div className="p-6 space-y-6">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Entity Extraction & Intelligence Enrichment</h1>
-            <p className="text-sm text-slate-500 mt-0.5">Automated entity identification, threat scoring, and risk tag attribution</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Entity Extraction & Intelligence Enrichment</h1>
+              <p className="text-sm text-slate-500 mt-0.5">Automated entity identification, threat scoring, and risk tag attribution</p>
+            </div>
+
+            {/* SECONDARY TOP ACTION BUTTON */}
+            <button 
+              onClick={handleNextStep}
+              disabled={isProcessing || enrichedRecords.length === 0}
+              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg shadow-sm flex items-center space-x-2 transition-all disabled:opacity-50"
+            >
+              <span>Next: Step 5 (Output Analysis)</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
           </div>
 
           {/* Stepper */}
@@ -389,4 +446,3 @@ export default function Enrichment() {
     </div>
   );
 }
-// At the end of Enrichment.jsx handleNextStep:

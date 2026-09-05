@@ -30,15 +30,21 @@ export default function Output() {
     const rawData = location.state?.pipelineData || JSON.parse(localStorage.getItem('pipelineData') || '{}');
     setRawPipelineData(rawData);
 
-    const records = rawData?.records || rawData?.data || [];
-    const sourceFileName = rawData?.fileName || rawData?.file_name || 'chat.csv';
+    const records = rawData?.records || rawData?.data || rawData?.items || [];
+    const sourceFileName = rawData?.fileName || rawData?.file_name || 'uploaded_data.csv';
 
-    // Group records by source input file name
+    // Group records dynamically by source file key
     const grouped = {};
 
     if (records.length > 0) {
       records.forEach((record) => {
-        const fileKey = record.source_file || record.origin_file || sourceFileName;
+        const fileKey =
+          record.source_file ||
+          record.fileName ||
+          record.file_name ||
+          record.origin_file ||
+          sourceFileName;
+
         if (!grouped[fileKey]) {
           grouped[fileKey] = [];
         }
@@ -100,9 +106,18 @@ export default function Output() {
     return String(val);
   };
 
-  // Helper to dynamically get headers for a file dataset excluding internal flags
+  // Helper to dynamically discover all dynamic columns for a specific sub-dataset
   const getColumnsForDataset = (recordsList) => {
-    const keys = new Set();
+    const keys = new Set([
+      'event_id',
+      'standard_type',
+      'source_entity',
+      'target_entity',
+      'iso_timestamp',
+      'extracted_entities',
+      'risk_score'
+    ]);
+
     recordsList.forEach((row) => {
       Object.keys(row).forEach((k) => {
         if (!['_id', 'rawItem', 'evidence'].includes(k)) {
@@ -110,6 +125,7 @@ export default function Output() {
         }
       });
     });
+
     return Array.from(keys);
   };
 
@@ -135,7 +151,9 @@ export default function Output() {
           <div className="flex items-center space-x-6">
             <div className="flex items-center space-x-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
               <span className="text-xs font-semibold text-slate-500">Case ID:</span>
-              <span className="text-sm font-bold text-indigo-900">MG-2024-1024</span>
+              <span className="text-sm font-bold text-indigo-900">
+                {rawPipelineData?.case_id || 'MG-2024-1024'}
+              </span>
               <ChevronDown className="h-4 w-4 text-slate-400" />
             </div>
 
@@ -266,7 +284,9 @@ export default function Output() {
             <div className="border-b border-slate-200 pb-4 flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-black text-indigo-950 uppercase tracking-wide">MULEGUARD EVIDENCE ANALYSIS REPORT</h2>
-                <p className="text-xs text-slate-500 font-semibold">Case Reference: MG-2024-1024 | Generated on: {new Date().toLocaleDateString()}</p>
+                <p className="text-xs text-slate-500 font-semibold">
+                  Case Reference: {rawPipelineData?.case_id || 'MG-2024-1024'} | Generated on: {new Date().toLocaleDateString()}
+                </p>
               </div>
               <div className="text-right">
                 <span className="text-xs font-mono font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded border border-indigo-200">
@@ -323,7 +343,7 @@ export default function Output() {
                               ))}
                               <td className="p-2.5 whitespace-nowrap">
                                 <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                                  <CheckCircle className="w-3 h-3 mr-1" /> Normalized
+                                  <CheckCircle className="w-3 h-3 mr-1" /> Enriched
                                 </span>
                               </td>
                             </tr>

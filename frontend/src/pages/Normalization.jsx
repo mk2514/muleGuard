@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom'; // Ensure react-router-dom in your setup
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   CheckCircle2,
   RefreshCw,
@@ -24,21 +24,88 @@ export default function Normalization() {
   const [dynamicColumns, setDynamicColumns] = useState([]);
   const [isProcessing, setIsProcessing] = useState(true);
 
+  // Dynamic helper function to resolve entity keys regardless of case/format
+  const getDynamicFieldValue = (item, keys, defaultValue = 'UNKNOWN') => {
+    for (const key of keys) {
+      if (item[key] !== undefined && item[key] !== null && item[key] !== '') {
+        return item[key];
+      }
+      // Case-insensitive search across dynamic object keys
+      const matchedKey = Object.keys(item).find(
+        (k) => k.toLowerCase().replace(/[^a-z0-9]/g, '') === key.toLowerCase().replace(/[^a-z0-9]/g, '')
+      );
+      if (matchedKey && item[matchedKey] !== undefined && item[matchedKey] !== null && item[matchedKey] !== '') {
+        return item[matchedKey];
+      }
+    }
+    return defaultValue;
+  };
+
   useEffect(() => {
     // 1. Fetch preprocessed pipeline state
     const rawData = location.state?.pipelineData || JSON.parse(localStorage.getItem('pipelineData') || '{}');
     setRawPipelineData(rawData);
 
-    const records = rawData?.records || rawData?.data || [];
+    const records = rawData?.records || rawData?.data || rawData?.items || [];
 
     setIsProcessing(true);
 
     setTimeout(() => {
       if (records.length > 0) {
-        // 2. Discover all unique attributes (including standard + non-standard fields)
-        const discoveredKeys = new Set(['event_id', 'standard_type', 'source_entity', 'target_entity', 'iso_timestamp']);
-        
-        records.forEach((item) => {
+        // 2. Unify canonical properties across diverse input schemes
+        const unified = records.map((item, index) => {
+          const source = getDynamicFieldValue(
+            item,
+            ['source', 'sender', 'sender_phone', 'caller', 'src_ip', 'from', 'a_party', 'account_source', 'client_ip'],
+            'UNKNOWN_SRC'
+          );
+
+          const target = getDynamicFieldValue(
+            item,
+            ['target', 'receiver', 'receiver_phone', 'called', 'dest_ip', 'to', 'b_party', 'account_target', 'destination_ip'],
+            'UNKNOWN_TGT'
+          );
+
+          const timestamp = getDynamicFieldValue(
+            item,
+            ['timestamp', 'iso_timestamp', 'event_timestamp', 'txn_date', 'date', 'created_at', 'call_date', 'time'],
+            new Date().toISOString()
+          );
+
+          const eventType = getDynamicFieldValue(
+            item,
+            ['type', 'detected_type', 'message_type', 'transaction_type', 'event_type', 'category', 'protocol'],
+            'GENERAL_LOG'
+          );
+
+          const sourceFile = getDynamicFieldValue(
+            item,
+            ['source_file', 'fileName', 'file_name', 'file', 'source_document'],
+            'uploaded_data.csv'
+          );
+
+          return {
+            ...item, // Preserve all dynamic raw properties
+            source_file: sourceFile,
+            event_id: item.event_id || item.id || item._id || `NORM-${index + 1}`,
+            standard_type: String(eventType).toUpperCase(),
+            source_entity: source,
+            target_entity: target,
+            iso_timestamp: timestamp
+          };
+        });
+
+        // 3. Discover all dynamic keys across the full normalized dataset
+        const discoveredKeys = new Set([
+          'event_id',
+          'standard_type',
+          'source_entity',
+          'target_entity',
+          'iso_timestamp',
+          'source_file'
+        ]);
+
+        unified.forEach((item) => {
           Object.keys(item).forEach((k) => {
             if (!['_id', 'rawItem', 'evidence'].includes(k)) {
               discoveredKeys.add(k);
@@ -48,26 +115,6 @@ export default function Normalization() {
 
         const columnList = Array.from(discoveredKeys);
         setDynamicColumns(columnList);
-
-        // 3. Perform Canonical Normalization without dropping custom attributes
-       // AFTER (In Normalization.jsx)
-const unified = records.map((item, index) => {
-  const source = item.source || item.sender || item.sender_phone || item.caller || item.src_ip || 'UNKNOWN_SRC';
-  const target = item.target || item.receiver || item.receiver_phone || item.called || item.dest_ip || 'UNKNOWN_TGT';
-  const timestamp = item.timestamp || item.iso_timestamp || item.event_timestamp || item.txn_date || new Date().toISOString();
-  const eventType = item.type || item.detected_type || item.message_type || 'GENERAL_LOG';
-
-  return {
-    ...item, // Spread raw properties first
-    source_file: item.source_file || item.fileName || item.file_name || 'uploaded_data.csv', // Preserve source filename
-    event_id: item.event_id || item.id || item._id || `NORM-${index + 1}`,
-    standard_type: String(eventType).toUpperCase(),
-    source_entity: source,
-    target_entity: target,
-    iso_timestamp: timestamp
-  };
-});
-
         setNormalizedRecords(unified);
       } else {
         setNormalizedRecords([]);
@@ -86,17 +133,17 @@ const unified = records.map((item, index) => {
     { step: 5, title: 'Output', sub: 'Ready for analysis', path: '/dashboard' },
   ];
 
- const handleNextStep = () => {
-  const updatedPayload = {
-    ...rawPipelineData,
-    records: normalizedRecords,
-    columns: dynamicColumns,
-    files: rawPipelineData?.files || [], // Retain file list metadata
-    status: 'NORMALIZED'
+  const handleNextStep = () => {
+    const updatedPayload = {
+      ...rawPipelineData,
+      records: normalizedRecords,
+      columns: dynamicColumns,
+      files: rawPipelineData?.files || [],
+      status: 'NORMALIZED'
+    };
+    localStorage.setItem('pipelineData', JSON.stringify(updatedPayload));
+    navigate('/enrichment', { state: { pipelineData: updatedPayload } });
   };
-  localStorage.setItem('pipelineData', JSON.stringify(updatedPayload));
-  navigate('/enrichment', { state: { pipelineData: updatedPayload } });
-};
 
   const formatHeader = (key) => {
     return key
@@ -119,7 +166,7 @@ const unified = records.map((item, index) => {
     <div className="flex h-screen bg-slate-50 font-sans text-slate-800">
       <div className="flex-1 flex flex-col overflow-y-auto">
         
-        {/* Header */}
+        {/* Top Navigation Bar */}
         <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-10">
           <div className="flex items-center space-x-4">
             <div className="relative w-80">
@@ -132,10 +179,22 @@ const unified = records.map((item, index) => {
             </div>
           </div>
 
-          <div className="flex items-center space-x-6">
+          <div className="flex items-center space-x-4">
+            {/* TOP NEXT PROCESS BUTTON */}
+            <button
+              onClick={handleNextStep}
+              disabled={isProcessing || normalizedRecords.length === 0}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-lg shadow-sm flex items-center space-x-2 transition-all disabled:opacity-50"
+            >
+              <span>Proceed to Step 4 (Enrichment)</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+
             <div className="flex items-center space-x-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
               <span className="text-xs font-semibold text-slate-500">Case ID:</span>
-              <span className="text-sm font-bold text-indigo-900">MG-2024-1024</span>
+              <span className="text-sm font-bold text-indigo-900">
+                {rawPipelineData?.case_id || 'MG-2024-1024'}
+              </span>
               <ChevronDown className="h-4 w-4 text-slate-400" />
             </div>
 
@@ -160,9 +219,21 @@ const unified = records.map((item, index) => {
 
         {/* Page Content */}
         <div className="p-6 space-y-6">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Schema Normalization Engine</h1>
-            <p className="text-sm text-slate-500 mt-0.5">Unifying heterogeneous evidence logs into a canonical data structure</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Schema Normalization Engine</h1>
+              <p className="text-sm text-slate-500 mt-0.5">Unifying heterogeneous evidence logs into a canonical data structure</p>
+            </div>
+
+            {/* SECONDARY TOP PROCESS ACTION BUTTON */}
+            <button 
+              onClick={handleNextStep}
+              disabled={isProcessing || normalizedRecords.length === 0}
+              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg shadow-sm flex items-center space-x-2 transition-all disabled:opacity-50"
+            >
+              <span>Next: Step 4 (Enrichment)</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
           </div>
 
           {/* Stepper */}
@@ -304,7 +375,7 @@ const unified = records.map((item, index) => {
               )}
             </div>
 
-            {/* Step Footer Navigation */}
+            {/* Bottom Step Footer Navigation */}
             <div className="flex items-center justify-between pt-4 border-t border-slate-100">
               <button 
                 onClick={() => navigate('/preprocessing', { state: { pipelineData: rawPipelineData } })}
