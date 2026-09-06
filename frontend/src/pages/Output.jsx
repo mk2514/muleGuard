@@ -12,7 +12,8 @@ import {
   Database,
   Table as TableIcon,
   CheckCircle,
-  Share2
+  Share2,
+  Link as LinkIcon
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -462,10 +463,18 @@ export default function Output() {
             <div className="flex space-x-3">
               <button
                 onClick={() => navigate('/datasources')}
-                className="px-5 py-2.5 bg-slate-800 text-white text-xs font-semibold rounded-lg hover:bg-slate-900 flex items-center space-x-2"
+                className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-50 flex items-center space-x-2 shadow-sm"
               >
                 <Share2 className="h-4 w-4" />
                 <span>Start New Investigation</span>
+              </button>
+              
+              <button
+                onClick={() => navigate(`/entities?caseId=${rawPipelineData?.case_id}`)}
+                className="px-5 py-2.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 flex items-center space-x-2 shadow-md transition-colors"
+              >
+                <LinkIcon className="h-4 w-4" />
+                <span>Proceed to Entity Resolution</span>
               </button>
             </div>
           </div>
