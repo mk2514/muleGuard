@@ -31,7 +31,7 @@ export default function DataSource() {
   const [searchParams] = useSearchParams();
 
   // Read caseId from ?caseId=MG-XXXX-XXXX query param (falls back to a default)
-  const activeCaseId = searchParams.get('caseId') || 'MG-2024-1024';
+  const activeCaseId = searchParams.get('caseId') || localStorage.getItem('active_case_id') || 'MG-2024-1024';
 
   // Active Pipeline Step
   const [activeStep, setActiveStep] = useState(1);

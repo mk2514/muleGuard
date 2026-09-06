@@ -52,7 +52,7 @@ export default function Preprocessing() {
   // 1. Retrieve Payload and Discover All Dynamic Keys Across Any Input
   useEffect(() => {
     // Extract caseId from navigate state (passed from DataSources)
-    const caseId = location.state?.caseId;
+    const caseId = location.state?.caseId || localStorage.getItem('active_case_id');
 
     // Load from case-scoped key first, then route state, then global fallback
     let rawData;

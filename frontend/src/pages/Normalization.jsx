@@ -43,7 +43,7 @@ export default function Normalization() {
 
   useEffect(() => {
     // 1. Extract caseId and fetch from case-scoped key first
-    const caseId = location.state?.caseId;
+    const caseId = location.state?.caseId || localStorage.getItem('active_case_id');
     let rawData;
     if (caseId) {
       const caseScoped = localStorage.getItem(`pipelineData_${caseId}`);

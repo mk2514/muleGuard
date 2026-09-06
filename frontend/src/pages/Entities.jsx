@@ -54,7 +54,7 @@ export default function Entities() {
 
   // Load Initial State
   useEffect(() => {
-    const caseId = searchParams.get('caseId') || location.state?.caseId;
+    const caseId = searchParams.get('caseId') || location.state?.caseId || localStorage.getItem('active_case_id');
     if (caseId) {
       setActiveCaseId(caseId);
       

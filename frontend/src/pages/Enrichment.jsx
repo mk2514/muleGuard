@@ -46,7 +46,7 @@ export default function Enrichment() {
 
   useEffect(() => {
     // 1. Extract caseId and retrieve normalized pipeline state from case-scoped key
-    const caseId = location.state?.caseId;
+    const caseId = location.state?.caseId || localStorage.getItem('active_case_id');
     let rawData;
     if (caseId) {
       const caseScoped = localStorage.getItem(`pipelineData_${caseId}`);

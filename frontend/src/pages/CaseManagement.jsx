@@ -136,7 +136,9 @@ export default function CaseManagement() {
 
     const updatedCases = [newCase, ...cases];
     saveCasesToStorage(updatedCases);
+    localStorage.setItem('active_case_id', newCase.case_id);
     setIsCreateModalOpen(false);
+    navigate(`/data-sources?caseId=${newCase.case_id}`);
   };
 
   const handleStatusChange = (caseId, newStatus) => {
@@ -151,6 +153,7 @@ export default function CaseManagement() {
 
   // Smart Navigation: Go to Output if processed data exists, else Data Sources
   const handleCaseClick = (caseId) => {
+    localStorage.setItem('active_case_id', caseId);
     if (localStorage.getItem(`output_${caseId}`)) {
       navigate(`/output?caseId=${caseId}`);
     } else {

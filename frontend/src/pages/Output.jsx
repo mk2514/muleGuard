@@ -33,7 +33,8 @@ export default function Output() {
     const caseId =
       location.state?.caseId ||
       rawPipelineData?.case_id ||
-      searchParams.get('caseId');
+      searchParams.get('caseId') ||
+      localStorage.getItem('active_case_id');
 
     // PRIORITY 1: Try loading already-persisted Stage 5 output for this case (survives refresh)
     if (caseId) {
