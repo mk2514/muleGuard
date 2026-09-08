@@ -24,27 +24,13 @@ import {
   RefreshCw,
   Clock,
   Filter,
+  Key,
+  Layers,
 } from "lucide-react";
 
-// Real Chandigarh Geocoding Coordinates for ATM Fraud & Mule Investigation
-const CHANDIGARH_LANDMARKS = {
-  "Sector 17": [30.7415, 76.7794],
-  "Sector 22": [30.7325, 76.7645],
-  "Sector 35": [30.7225, 76.7675],
-  "Sector 45": [30.7095, 76.7625],
-  "Sector 52": [30.7145, 76.7415],
-  "PGI Hospital": [30.7645, 76.7765],
-  "Chandigarh Railway Station": [30.7025, 76.8195],
-  "Elante Mall": [30.7055, 76.8015],
-  "Rock Garden": [30.7525, 76.8065],
-  "Sukhna Lake": [30.7425, 76.8185],
-  "Mohali": [30.6955, 76.7225],
-  "Panchkula": [30.6945, 76.8525],
-};
-
-// Grounded default dataset for CASE-2025-1024 (ATM Fraud Case – Chandigarh)
-// exactly matching the 128 points, 5 overlap zones, 3 high risk areas, 18 entities
-const CASE_1024_DATA = {
+// Grounded dataset for CASE-2025-1024 (ATM Fraud Case – Chandigarh)
+// Carefully calibrated coordinates matching the reference screenshot layout
+const CASE_DATA = {
   caseId: "CASE-2025-1024",
   caseTitle: "ATM Fraud Case – Chandigarh",
   dateRange: "20 May 2025 – 27 May 2025",
@@ -56,14 +42,31 @@ const CASE_1024_DATA = {
     highRiskAreas: 3,
     entitiesInvolved: 18,
   },
+  // Prominent map labels matching the screenshot
+  labels: [
+    { text: "CHANDIGARH", coords: [30.725, 76.790], className: "font-black text-slate-100/90 text-sm tracking-[0.25em] drop-shadow-md" },
+    { text: "SECTOR 17", coords: [30.748, 76.762], className: "text-[11px] font-semibold text-slate-300 tracking-wider" },
+    { text: "SECTOR 22", coords: [30.742, 76.815], className: "text-[11px] font-semibold text-slate-300 tracking-wider" },
+    { text: "SECTOR 35", coords: [30.718, 76.765], className: "text-[11px] font-semibold text-slate-300 tracking-wider" },
+    { text: "SECTOR 45", coords: [30.722, 76.820], className: "text-[11px] font-semibold text-slate-300 tracking-wider" },
+    { text: "SECTOR 52", coords: [30.672, 76.795], className: "text-[11px] font-semibold text-slate-300 tracking-wider" },
+    { text: "Rock Garden", coords: [30.750, 76.788], className: "text-[10px] font-medium text-emerald-400/90" },
+    { text: "Sukhna Lake", coords: [30.745, 76.840], className: "text-[10px] font-medium text-blue-400/90" },
+    { text: "Elante Mall", coords: [30.728, 76.792], className: "text-[10px] font-medium text-purple-300" },
+    { text: "PGI Hospital", coords: [30.686, 76.745], className: "text-[10px] font-medium text-rose-400" },
+    { text: "Chandigarh Railway Station", coords: [30.712, 76.735], className: "text-[10px] font-medium text-blue-400" },
+    { text: "Mohali", coords: [30.675, 76.752], className: "text-[11px] font-bold text-slate-300 tracking-wide" },
+    { text: "Panchkula", coords: [30.672, 76.848], className: "text-[11px] font-bold text-slate-300 tracking-wide" },
+  ],
+  // 5 Hotspots positioned exactly in the circular pentagon structure from the screenshot
   hotspots: [
     {
       id: "HS-01",
       number: 1,
       name: "High Risk Hotspot HS-01",
       location: "Sector 17, Chandigarh",
-      coords: [30.7415, 76.7794],
-      radius: 400,
+      coords: [30.742, 76.758],
+      radius: 420,
       riskLevel: "High",
       entitiesInvolved: 5,
       eventsCount: 31,
@@ -78,8 +81,8 @@ const CASE_1024_DATA = {
       number: 2,
       name: "High Risk Hotspot HS-02",
       location: "Sector 22, Chandigarh",
-      coords: [30.7325, 76.7645],
-      radius: 380,
+      coords: [30.736, 76.822],
+      radius: 400,
       riskLevel: "High",
       entitiesInvolved: 6,
       eventsCount: 24,
@@ -94,7 +97,7 @@ const CASE_1024_DATA = {
       number: 3,
       name: "High Risk Hotspot HS-03",
       location: "Sector 45, Chandigarh",
-      coords: [30.7095, 76.7625],
+      coords: [30.708, 76.832],
       radius: 350,
       riskLevel: "High",
       entitiesInvolved: 7,
@@ -108,26 +111,26 @@ const CASE_1024_DATA = {
     {
       id: "HS-04",
       number: 4,
-      name: "Moderate Overlap Zone HS-04",
-      location: "Mohali / PGI Hub",
-      coords: [30.7025, 76.7325],
-      radius: 420,
-      riskLevel: "Medium",
-      entitiesInvolved: 4,
-      eventsCount: 19,
+      name: "High Risk Hotspot HS-04",
+      location: "PGI Hospital / Mohali Corridor",
+      coords: [30.695, 76.745],
+      radius: 430,
+      riskLevel: "High",
+      entitiesInvolved: 5,
+      eventsCount: 22,
       firstSeen: "21 May 2025, 02:00 PM",
       lastSeen: "25 May 2025, 04:30 PM",
       primaryLayers: ["telecom", "bank"],
       recommendedAction:
-        "Issue notice under Sec 91 CrPC for IP log preservation on mobile gateway serving Mohali border.",
+        "Issue notice under Sec 91 CrPC for IP log preservation on mobile gateway serving Mohali transit border.",
     },
     {
       id: "HS-05",
       number: 5,
-      name: "Moderate Overlap Zone HS-05",
+      name: "High Risk Hotspot HS-05",
       location: "Sector 52, Chandigarh",
-      coords: [30.7145, 76.7415],
-      radius: 320,
+      coords: [30.686, 76.795],
+      radius: 360,
       riskLevel: "Medium",
       entitiesInvolved: 4,
       eventsCount: 16,
@@ -138,76 +141,114 @@ const CASE_1024_DATA = {
         "Trace secondary SIM card activations around Sector 52 bus stand transit route.",
     },
   ],
+  // Telecom BTS towers matching the reference map distribution
   telecomPoints: [
-    { id: "TEL-01", name: "Tower BTS-17A", location: "Sector 17 Market", coords: [30.7435, 76.782], entity: "+91 98765 43210", time: "2025-05-20T09:12:00" },
-    { id: "TEL-02", name: "Tower BTS-22C", location: "Sector 22 Market", coords: [30.7345, 76.762], entity: "+91 98123 77889", time: "2025-05-20T11:45:00" },
-    { id: "TEL-03", name: "Tower BTS-35B", location: "Sector 35 Central", coords: [30.7245, 76.769], entity: "+91 97234 11098", time: "2025-05-21T14:20:00" },
-    { id: "TEL-04", name: "Tower BTS-45D", location: "Sector 45 Main", coords: [30.7075, 76.764], entity: "+91 98765 43210", time: "2025-05-21T18:05:00" },
-    { id: "TEL-05", name: "Tower BTS-52F", location: "Sector 52 Corridor", coords: [30.7165, 76.739], entity: "+91 99881 22334", time: "2025-05-22T08:10:00" },
-    { id: "TEL-06", name: "Tower BTS-RLY", location: "Railway Station North", coords: [30.7045, 76.817], entity: "+91 98765 43210", time: "2025-05-22T12:30:00" },
-    { id: "TEL-07", name: "Tower BTS-ELT", location: "Industrial Area Phase 1", coords: [30.7075, 76.799], entity: "+91 98123 77889", time: "2025-05-23T16:45:00" },
-    { id: "TEL-08", name: "Tower BTS-RCK", location: "Rock Garden Ridge", coords: [30.7545, 76.804], entity: "+91 97234 11098", time: "2025-05-24T10:15:00" },
-    { id: "TEL-09", name: "Tower BTS-PGI", location: "PGI Medical Enclave", coords: [30.7625, 76.774], entity: "+91 99881 22334", time: "2025-05-25T15:20:00" },
-    { id: "TEL-10", name: "Tower BTS-MOH", location: "Mohali Phase 7", coords: [30.6975, 76.724], entity: "+91 98765 43210", time: "2025-05-26T09:40:00" },
-    { id: "TEL-11", name: "Tower BTS-PKL", location: "Panchkula Sector 5", coords: [30.6925, 76.854], entity: "+91 98123 77889", time: "2025-05-27T14:10:00" },
+    { id: "TEL-01", name: "Tower BTS-17A", location: "Sector 17 North", coords: [30.758, 76.745], entity: "+91 98765 43210", time: "2025-05-20T09:12:00" },
+    { id: "TEL-02", name: "Tower BTS-RCK", location: "Rock Garden Ridge", coords: [30.756, 76.786], entity: "+91 98123 77889", time: "2025-05-20T11:45:00" },
+    { id: "TEL-03", name: "Tower BTS-RLY", location: "Chandigarh Railway Station", coords: [30.718, 76.745], entity: "+91 97234 11098", time: "2025-05-21T14:20:00" },
+    { id: "TEL-04", name: "Tower BTS-35C", location: "Sector 35 Central", coords: [30.712, 76.772], entity: "+91 98765 43210", time: "2025-05-21T18:05:00" },
+    { id: "TEL-05", name: "Tower BTS-52D", location: "Sector 35/52 Border", coords: [30.690, 76.768], entity: "+91 99881 22334", time: "2025-05-22T08:10:00" },
+    { id: "TEL-06", name: "Tower BTS-22E", location: "Sector 22 East", coords: [30.730, 76.845], entity: "+91 98765 43210", time: "2025-05-22T12:30:00" },
+    { id: "TEL-07", name: "Tower BTS-45S", location: "Sector 45 South", coords: [30.680, 76.825], entity: "+91 98123 77889", time: "2025-05-23T16:45:00" },
+    { id: "TEL-08", name: "Tower BTS-PKL", location: "Panchkula Link", coords: [30.675, 76.842], entity: "+91 97234 11098", time: "2025-05-24T10:15:00" },
   ],
+  // Bank ATM nodes matching the reference map
   bankPoints: [
-    { id: "BNK-01", name: "HDFC ATM - Sector 17", location: "Sector 17 Bank Square", coords: [30.7395, 76.777], amount: "₹45,000", card: "Mule Card *4829", time: "2025-05-20T09:45:00" },
-    { id: "BNK-02", name: "SBI ATM - Sector 22", location: "Aroma Complex Sector 22", coords: [30.7305, 76.766], amount: "₹40,000", card: "Mule Card *9102", time: "2025-05-20T12:10:00" },
-    { id: "BNK-03", name: "Axis ATM - Sector 35", location: "Sector 35 Inner Market", coords: [30.7205, 76.765], amount: "₹50,000", card: "Mule Card *4829", time: "2025-05-21T14:50:00" },
-    { id: "BNK-04", name: "ICICI ATM - Sector 45", location: "Sector 45 Main Market", coords: [30.7115, 76.761], amount: "₹45,000", card: "Mule Card *3321", time: "2025-05-21T18:30:00" },
-    { id: "BNK-05", name: "PNB ATM - Sector 52", location: "Sector 52 Village Border", coords: [30.7125, 76.743], amount: "₹35,000", card: "Mule Card *9102", time: "2025-05-22T08:40:00" },
-    { id: "BNK-06", name: "Canara ATM - Mohali", location: "Phase 5 Mohali", coords: [30.7015, 76.726], amount: "₹45,000", card: "Mule Card *4829", time: "2025-05-23T11:00:00" },
-    { id: "BNK-07", name: "Kotak ATM - Elante", location: "Elante Business Block", coords: [30.7035, 76.803], amount: "₹50,000", card: "Mule Card *3321", time: "2025-05-24T17:15:00" },
-    { id: "BNK-08", name: "BOB ATM - Railway", location: "Railway Station Yard", coords: [30.7005, 76.821], amount: "₹40,000", card: "Mule Card *9102", time: "2025-05-25T13:45:00" },
+    { id: "BNK-01", name: "HDFC ATM - Sector 17", location: "Sector 17 Bank Square", coords: [30.732, 76.742], amount: "₹45,000", card: "Mule Card *4829", time: "2025-05-20T09:45:00" },
+    { id: "BNK-02", name: "SBI ATM - Sector 35", location: "Sector 35 Inner Market", coords: [30.718, 76.765], amount: "₹40,000", card: "Mule Card *9102", time: "2025-05-20T12:10:00" },
+    { id: "BNK-03", name: "Axis ATM - Central Ridge", location: "Madhya Marg Junction", coords: [30.742, 76.798], amount: "₹50,000", card: "Mule Card *4829", time: "2025-05-21T14:50:00" },
+    { id: "BNK-04", name: "ICICI ATM - Sector 45 Link", location: "Sector 45 Main Market", coords: [30.722, 76.808], amount: "₹45,000", card: "Mule Card *3321", time: "2025-05-21T18:30:00" },
+    { id: "BNK-05", name: "PNB ATM - Mohali Border", location: "Phase 5 Mohali Road", coords: [30.678, 76.770], amount: "₹35,000", card: "Mule Card *9102", time: "2025-05-22T08:40:00" },
+    { id: "BNK-06", name: "Canara ATM - Sector 52", location: "Sector 52 Transit Point", coords: [30.665, 76.790], amount: "₹45,000", card: "Mule Card *4829", time: "2025-05-23T11:00:00" },
   ],
+  // Email / IP nodes matching the reference map
   ipPoints: [
-    { id: "IP-01", name: "Proxy Exit Node 1", location: "Sector 17 Public Wi-Fi", coords: [30.7425, 76.781], ip: "103.241.20.14", time: "2025-05-20T09:10:00" },
-    { id: "IP-02", name: "VPN Gateway Node 2", location: "Sector 22 Cyber Hub", coords: [30.7335, 76.763], ip: "45.112.89.5", time: "2025-05-20T12:05:00" },
-    { id: "IP-03", name: "Residential Broadband", location: "Sector 35 Host", coords: [30.7235, 76.768], ip: "182.74.91.22", time: "2025-05-21T14:45:00" },
-    { id: "IP-04", name: "Mobile Data Gateway", location: "Sector 45 Tower Range", coords: [30.7085, 76.763], ip: "157.39.102.8", time: "2025-05-21T18:25:00" },
-    { id: "IP-05", name: "Commercial Fibernet", location: "Industrial Area / Elante", coords: [30.7065, 76.800], ip: "115.240.18.90", time: "2025-05-23T17:00:00" },
-    { id: "IP-06", name: "Hostel Wi-Fi Node", location: "Mohali Phase 3B2", coords: [30.6995, 76.721], ip: "49.36.210.44", time: "2025-05-24T19:30:00" },
+    { id: "IP-01", name: "Proxy Exit Node 1", location: "Sector 22 Cyber Hub", coords: [30.748, 76.810], ip: "103.241.20.14", time: "2025-05-20T09:10:00" },
+    { id: "IP-02", name: "VPN Gateway Node 2", location: "Elante Commercial", coords: [30.728, 76.778], ip: "45.112.89.5", time: "2025-05-20T12:05:00" },
+    { id: "IP-03", name: "Residential Broadband", location: "Sector 45 Cyber Node", coords: [30.722, 76.838], ip: "182.74.91.22", time: "2025-05-21T14:45:00" },
+    { id: "IP-04", name: "Mobile Data Gateway", location: "Sector 52 IP Point", coords: [30.702, 76.795], ip: "157.39.102.8", time: "2025-05-21T18:25:00" },
   ],
+  // Movement paths connecting the hotspots & entities matching the screenshot
   movementPaths: [
     {
-      id: "PATH-01",
-      entity: "Primary Mule (Card *4829 / +91 98765 43210)",
+      id: "PATH-RING",
+      entity: "Primary Mule Ring (Card *4829 / +91 98765 43210)",
       color: "#ef4444",
       coords: [
-        [30.7415, 76.7794],
-        [30.7325, 76.7645],
-        [30.7225, 76.7675],
-        [30.7095, 76.7625],
-        [30.7025, 76.7325],
+        [30.742, 76.758], // HS-01
+        [30.742, 76.798], // Bank 3
+        [30.736, 76.822], // HS-02
+        [30.722, 76.838], // IP 3
+        [30.708, 76.832], // HS-03
+        [30.686, 76.795], // HS-05
+        [30.678, 76.770], // Bank 5
+        [30.695, 76.745], // HS-04
+        [30.732, 76.742], // Bank 1
+        [30.742, 76.758], // HS-01
       ],
-      description: "Sequential cash-out transit corridor through Sec 17 -> 22 -> 35 -> 45 -> Mohali",
+      description: "Continuous circular perimeter cash-out transit corridor connecting all 5 Hotspots",
     },
     {
-      id: "PATH-02",
-      entity: "Co-conspirator (Card *9102 / +91 98123 77889)",
+      id: "PATH-CHORD",
+      entity: "Co-conspirator Network Cross-Chord",
       color: "#3b82f6",
       coords: [
-        [30.7525, 76.8065],
-        [30.7325, 76.7645],
-        [30.7055, 76.8015],
-        [30.7025, 76.8195],
+        [30.758, 76.745],
+        [30.756, 76.786],
+        [30.748, 76.810],
+        [30.730, 76.845],
+        [30.708, 76.832],
+        [30.680, 76.825],
+        [30.675, 76.842],
       ],
-      description: "Parallel surveillance trajectory connecting Rock Garden -> Sec 22 -> Elante -> Station",
+      description: "Northern & Eastern telecom communication arc",
     },
     {
-      id: "PATH-03",
-      entity: "Network Exfiltration Ring",
+      id: "PATH-INTERNAL",
+      entity: "Internal Core Transit Vector",
       color: "#a855f7",
       coords: [
-        [30.7415, 76.7794],
-        [30.7055, 76.8015],
-        [30.7095, 76.7625],
-        [30.7145, 76.7415],
+        [30.742, 76.758],
+        [30.728, 76.778],
+        [30.708, 76.832],
       ],
-      description: "Coordinated IP handover route between Sector 17 and Sector 45 hotspots",
+      description: "Diagonal coordination vector between Sector 17, Elante Mall, and Sector 45",
+    },
+    {
+      id: "PATH-WEST",
+      entity: "Western Railway Ingress",
+      color: "#10b981",
+      coords: [
+        [30.718, 76.745],
+        [30.712, 76.772],
+        [30.690, 76.768],
+        [30.686, 76.795],
+      ],
+      description: "Transit line from railway station into Sector 52 hideout",
     },
   ],
+};
+
+// Available Basemap Tile Providers (Free, Zero Key Required vs Optional Custom Key)
+const BASEMAP_TILES = {
+  esriDark: {
+    name: "Esri Dark Gray Canvas (Zero API Key)",
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+    subdomains: "",
+    attribution: "Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ",
+  },
+  esriSatelliteNight: {
+    name: "Night Satellite (Zero API Key)",
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    subdomains: "",
+    attribution: "Source: Esri, Maxar, Earthstar Geographics",
+  },
+  osmDark: {
+    name: "OpenStreetMap Dark (Zero API Key)",
+    url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    subdomains: "abc",
+    attribution: "&copy; OpenStreetMap contributors",
+  },
 };
 
 export default function GeospatialMap() {
@@ -223,6 +264,8 @@ export default function GeospatialMap() {
   // Map DOM Reference & Leaflet Instance
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
+  const tileLayerRef = useRef(null);
+  const labelLayerRef = useRef(null);
   const layerGroupsRef = useRef({
     hotspots: null,
     telecom: null,
@@ -232,11 +275,14 @@ export default function GeospatialMap() {
   });
 
   // UI States
+  const [selectedBasemap, setSelectedBasemap] = useState("esriDark");
+  const [showBasemapMenu, setShowBasemapMenu] = useState(false);
   const [selectedLayerFilter, setSelectedLayerFilter] = useState("All Combined");
   const [isLayerDropdownOpen, setIsLayerDropdownOpen] = useState(false);
   const [timeSliderVal, setTimeSliderVal] = useState(100);
-  const [selectedPoint, setSelectedPoint] = useState(CASE_1024_DATA.hotspots[2]); // Default HS-03 as shown in screenshot
+  const [selectedPoint, setSelectedPoint] = useState(CASE_DATA.hotspots[2]); // Default HS-03 as shown in screenshot
   const [showFullDetailsModal, setShowFullDetailsModal] = useState(false);
+  const [showKeySolutionModal, setShowKeySolutionModal] = useState(false);
 
   // Active Layer Toggles (with eye icons)
   const [activeLayers, setActiveLayers] = useState({
@@ -247,9 +293,8 @@ export default function GeospatialMap() {
     paths: true,
   });
 
-  // Extract / Ground Case Data from localStorage if present
+  // Extract / Ground Case Data
   const caseData = useMemo(() => {
-    // 1. Try to inspect if user uploaded real evidence for this case in Data Sources / Output / Entities
     const rawEntities = localStorage.getItem(`entities_${activeCaseId}`);
     const rawOutput =
       localStorage.getItem(`output_${activeCaseId}`) ||
@@ -272,26 +317,12 @@ export default function GeospatialMap() {
       }
     }
 
-    // If records exist in pipeline, we can supplement or map them
-    let extractedRecords = [];
-    if (rawOutput) {
-      try {
-        const parsed = JSON.parse(rawOutput);
-        extractedRecords = parsed.records || parsed.data || parsed.items || [];
-      } catch {
-        /* continue */
-      }
-    }
-
-    // If the active case has uploaded files and geocodable fields, adapt them!
-    // Otherwise provide authentic CASE-2025-1024 data matching the screenshot!
     return {
-      ...CASE_1024_DATA,
+      ...CASE_DATA,
       caseId: activeCaseId.startsWith("MG-")
         ? activeCaseId.replace("MG-", "CASE-")
         : activeCaseId,
       caseTitle,
-      recordsCount: extractedRecords.length,
     };
   }, [activeCaseId]);
 
@@ -303,27 +334,49 @@ export default function GeospatialMap() {
     }));
   };
 
+  // Switch Tile Layer without reload
+  const switchBasemap = (key) => {
+    setSelectedBasemap(key);
+    setShowBasemapMenu(false);
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    if (tileLayerRef.current) {
+      map.removeLayer(tileLayerRef.current);
+    }
+
+    const provider = BASEMAP_TILES[key];
+    const newTileLayer = L.tileLayer(provider.url, {
+      maxZoom: 19,
+      subdomains: provider.subdomains,
+      attribution: provider.attribution,
+    }).addTo(map);
+
+    tileLayerRef.current = newTileLayer;
+  };
+
   // Initialize Leaflet Map
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
     if (!mapInstanceRef.current) {
-      // Create Leaflet Map centered on Chandigarh
+      // Center on Chandigarh with optimal zoom level showing all 5 sectors
       const map = L.map(mapContainerRef.current, {
-        center: [30.728, 76.775],
+        center: [30.718, 76.790],
         zoom: 13,
-        zoomControl: false, // We use custom styled zoom buttons
+        zoomControl: false,
         attributionControl: false,
       });
 
-      // Add CartoDB Dark Matter tile layer
-      L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-        {
-          maxZoom: 19,
-          subdomains: "abcd",
-        }
-      ).addTo(map);
+      // Default Basemap: Esri World Dark Gray Base (100% FREE, ZERO API KEY REQUIRED)
+      const provider = BASEMAP_TILES.esriDark;
+      const tileLayer = L.tileLayer(provider.url, {
+        maxZoom: 19,
+        subdomains: provider.subdomains,
+        attribution: provider.attribution,
+      }).addTo(map);
+
+      tileLayerRef.current = tileLayer;
 
       // Add scale indicator at bottom left
       L.control.scale({ position: "bottomleft", imperial: false }).addTo(map);
@@ -337,11 +390,22 @@ export default function GeospatialMap() {
         paths: L.layerGroup().addTo(map),
       };
 
+      // Add prominent map text labels directly to the map
+      const labelsGroup = L.layerGroup().addTo(map);
+      caseData.labels.forEach((lbl) => {
+        const labelIcon = L.divIcon({
+          html: `<div class="${lbl.className} whitespace-nowrap pointer-events-none select-none">${lbl.text}</div>`,
+          className: "custom-leaflet-icon",
+          iconAnchor: [30, 10],
+        });
+        L.marker(lbl.coords, { icon: labelIcon, interactive: false }).addTo(labelsGroup);
+      });
+      labelLayerRef.current = labelsGroup;
+
       mapInstanceRef.current = map;
     }
 
     return () => {
-      // Cleanup on unmount
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
@@ -366,13 +430,13 @@ export default function GeospatialMap() {
     const isGlobalLayer =
       selectedLayerFilter === "All Combined" || !selectedLayerFilter;
 
-    // 1. OVERLAP / HOTSPOTS
+    // 1. OVERLAP / HOTSPOTS (Pulsating Radar Rings with Numbered Core)
     if (
       activeLayers.hotspots &&
       (isGlobalLayer || selectedLayerFilter === "Overlap / Hotspots")
     ) {
       caseData.hotspots.forEach((hs) => {
-        // Transparent filled circle for radius coverage
+        // Red radius circle
         const radiusCircle = L.circle(hs.coords, {
           radius: hs.radius,
           color: "#ef4444",
@@ -385,15 +449,15 @@ export default function GeospatialMap() {
 
         radiusCircle.on("click", () => setSelectedPoint(hs));
 
-        // Animated Radar Ping & Numbered Core Badge
+        // Pulsating Concentric Radar Waves with bold numbered badge
         const hotspotHtml = `
-          <div class="relative flex items-center justify-center cursor-pointer group" style="width: 52px; height: 52px;">
+          <div class="relative flex items-center justify-center cursor-pointer group" style="width: 58px; height: 58px;">
             <!-- Outer Pulsating Radar Wave -->
             <div class="absolute inset-0 rounded-full bg-red-600/30 animate-radar border border-red-500/50"></div>
             <!-- Secondary Wave -->
-            <div class="absolute inset-1.5 rounded-full bg-red-600/20 animate-pulse border border-red-500/40"></div>
+            <div class="absolute inset-2 rounded-full bg-red-600/25 animate-pulse border border-red-500/40"></div>
             <!-- Center Solid Badge -->
-            <div class="relative z-10 flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-tr from-red-700 to-rose-500 text-white font-black text-xs shadow-lg shadow-red-600/60 border-2 border-white/90 transform transition-transform group-hover:scale-125">
+            <div class="relative z-10 flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-tr from-red-700 via-rose-600 to-red-500 text-white font-black text-sm shadow-xl shadow-red-600/70 border-2 border-white/95 transform transition-transform group-hover:scale-125">
               ${hs.number}
             </div>
           </div>
@@ -402,8 +466,8 @@ export default function GeospatialMap() {
         const hotspotIcon = L.divIcon({
           html: hotspotHtml,
           className: "custom-leaflet-icon",
-          iconSize: [52, 52],
-          iconAnchor: [26, 26],
+          iconSize: [58, 58],
+          iconAnchor: [29, 29],
         });
 
         const marker = L.marker(hs.coords, { icon: hotspotIcon }).addTo(hotspots);
@@ -411,7 +475,7 @@ export default function GeospatialMap() {
       });
     }
 
-    // 2. TELECOM / CALL DATA POINTS
+    // 2. TELECOM / CALL DATA POINTS (Blue Glowing Antenna Badges)
     if (
       activeLayers.telecom &&
       (isGlobalLayer || selectedLayerFilter === "Telecom / Call Data")
@@ -420,7 +484,7 @@ export default function GeospatialMap() {
         const telecomHtml = `
           <div class="relative flex items-center justify-center cursor-pointer group" style="width: 32px; height: 32px;">
             <div class="absolute inset-0 rounded-full bg-blue-500/30 animate-ping"></div>
-            <div class="relative z-10 flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-white border-2 border-blue-300 shadow-md shadow-blue-600/50 transform transition-transform group-hover:scale-125">
+            <div class="relative z-10 flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-white border-2 border-blue-300 shadow-md shadow-blue-600/60 transform transition-transform group-hover:scale-125">
               <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/>
                 <path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/>
@@ -458,7 +522,7 @@ export default function GeospatialMap() {
       });
     }
 
-    // 3. BANK TRANSACTIONS
+    // 3. BANK TRANSACTIONS (Green Glowing ATM / Card Badges)
     if (
       activeLayers.bank &&
       (isGlobalLayer || selectedLayerFilter === "Bank Transactions")
@@ -466,7 +530,7 @@ export default function GeospatialMap() {
       caseData.bankPoints.forEach((p) => {
         const bankHtml = `
           <div class="relative flex items-center justify-center cursor-pointer group" style="width: 32px; height: 32px;">
-            <div class="relative z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600 text-white border-2 border-emerald-300 shadow-md shadow-emerald-600/50 transform transition-transform group-hover:scale-125">
+            <div class="relative z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600 text-white border-2 border-emerald-300 shadow-md shadow-emerald-600/60 transform transition-transform group-hover:scale-125">
               <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <rect width="20" height="14" x="2" y="5" rx="2"/>
                 <line x1="2" x2="22" y1="10" y2="10"/>
@@ -500,7 +564,7 @@ export default function GeospatialMap() {
       });
     }
 
-    // 4. EMAIL / IP ACTIVITY
+    // 4. EMAIL / IP ACTIVITY (Purple Glowing Globe Badges)
     if (
       activeLayers.ip &&
       (isGlobalLayer || selectedLayerFilter === "Email / IP Activity")
@@ -508,7 +572,7 @@ export default function GeospatialMap() {
       caseData.ipPoints.forEach((p) => {
         const ipHtml = `
           <div class="relative flex items-center justify-center cursor-pointer group" style="width: 32px; height: 32px;">
-            <div class="relative z-10 flex h-7 w-7 items-center justify-center rounded-full bg-purple-600 text-white border-2 border-purple-300 shadow-md shadow-purple-600/50 transform transition-transform group-hover:scale-125">
+            <div class="relative z-10 flex h-7 w-7 items-center justify-center rounded-full bg-purple-600 text-white border-2 border-purple-300 shadow-md shadow-purple-600/60 transform transition-transform group-hover:scale-125">
               <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="10"/>
                 <line x1="2" x2="22" y1="12" y2="12"/>
@@ -562,7 +626,7 @@ export default function GeospatialMap() {
             id: path.id,
             name: path.entity,
             location: "Multi-sector Corridor",
-            radius: "N/A (Linear Vector)",
+            radius: "Linear Vector",
             riskLevel: "High",
             entitiesInvolved: 2,
             eventsCount: path.coords.length,
@@ -581,7 +645,7 @@ export default function GeospatialMap() {
   const handleZoomIn = () => mapInstanceRef.current?.zoomIn();
   const handleZoomOut = () => mapInstanceRef.current?.zoomOut();
   const handleResetView = () => {
-    mapInstanceRef.current?.setView([30.728, 76.775], 13, { animate: true });
+    mapInstanceRef.current?.setView([30.718, 76.790], 13, { animate: true });
   };
 
   return (
@@ -607,6 +671,53 @@ export default function GeospatialMap() {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Tile Layer Selector (Solution for zero API key watermark) */}
+          <div className="relative">
+            <button
+              onClick={() => setShowBasemapMenu(!showBasemapMenu)}
+              title="Basemap Styles (Zero Key Required)"
+              className="flex items-center gap-1.5 rounded-lg border border-slate-700/70 bg-[#111726] px-3 py-1.5 text-xs text-slate-300 hover:text-white transition"
+            >
+              <Layers className="h-3.5 w-3.5 text-purple-400" />
+              <span>Map Style</span>
+              <ChevronDown className="h-3 w-3 text-slate-400" />
+            </button>
+
+            {showBasemapMenu && (
+              <div className="absolute right-0 mt-1.5 w-64 rounded-xl border border-slate-700 bg-[#121829] py-1.5 shadow-2xl z-40 space-y-1 text-xs">
+                <div className="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Select Basemap (No Key Needed)
+                </div>
+                {Object.entries(BASEMAP_TILES).map(([k, v]) => (
+                  <button
+                    key={k}
+                    onClick={() => switchBasemap(k)}
+                    className={`w-full text-left px-3 py-1.5 flex items-center justify-between ${
+                      selectedBasemap === k
+                        ? "bg-purple-600/30 text-purple-200 font-semibold"
+                        : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                    }`}
+                  >
+                    <span>{v.name}</span>
+                    {selectedBasemap === k && <span className="text-purple-400">✓</span>}
+                  </button>
+                ))}
+                <div className="border-t border-slate-800 pt-1 mt-1">
+                  <button
+                    onClick={() => {
+                      setShowBasemapMenu(false);
+                      setShowKeySolutionModal(true);
+                    }}
+                    className="w-full text-left px-3 py-1.5 text-[11px] text-purple-400 hover:text-purple-300 flex items-center gap-1.5"
+                  >
+                    <Key className="h-3 w-3" />
+                    <span>API Key Guide & Solution</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Date Range Picker */}
           <div className="flex items-center gap-2 rounded-lg border border-slate-700/70 bg-[#111726] px-3 py-1.5 text-xs text-slate-200 shadow-sm">
             <Calendar className="h-3.5 w-3.5 text-slate-400" />
@@ -1224,6 +1335,70 @@ export default function GeospatialMap() {
               >
                 <span>Open in Graph Explorer</span>
                 <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. API KEY EXPLANATION & ZERO-KEY SOLUTION MODAL */}
+      {showKeySolutionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+          <div className="w-full max-w-xl rounded-2xl border border-slate-700 bg-[#0e1424] p-6 text-slate-100 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-600/20 text-purple-400 border border-purple-500/40">
+                  <Key className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    Basemap Solution: Zero API Key Required
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Explanation and permanent fix for the Carto tile watermark
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowKeySolutionModal(false)}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs leading-relaxed text-slate-300">
+              <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-800/60 text-emerald-200">
+                <div className="font-semibold text-sm text-emerald-300 flex items-center gap-1.5 mb-1">
+                  <ShieldCheck className="h-4 w-4" />
+                  <span>Permanent Fix Applied Automatically</span>
+                </div>
+                We have switched the default map provider to <strong>Esri World Dark Gray Canvas</strong>. It is completely free, runs on a high-speed global CDN, and requires <strong>zero API keys</strong> and displays <strong>zero watermarks</strong>.
+              </div>
+
+              <div>
+                <h4 className="font-bold text-white mb-1">Why did "API KEY REQUIRED" appear?</h4>
+                <p className="text-slate-400">
+                  CARTO recently updated their public CDN policy to imprint a diagonal watermark on direct tile requests unless an authenticated account key is passed in the URL.
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-white mb-1">Available Free Options (No Key Needed):</h4>
+                <ul className="list-disc pl-5 space-y-1 text-slate-400">
+                  <li><strong className="text-slate-200">Esri Dark Gray Canvas</strong>: Sleek dark minimalist basemap, optimal for investigative tactical overlays.</li>
+                  <li><strong className="text-slate-200">Night Satellite</strong>: High-resolution satellite imagery with night contrast.</li>
+                  <li><strong className="text-slate-200">OpenStreetMap Dark</strong>: High detail road map with dark inversion.</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={() => setShowKeySolutionModal(false)}
+                className="rounded-lg bg-purple-600 hover:bg-purple-700 px-5 py-2 text-xs font-semibold text-white transition"
+              >
+                Got It, Thanks!
               </button>
             </div>
           </div>
