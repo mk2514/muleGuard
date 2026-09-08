@@ -458,11 +458,17 @@ export default function IntelligenceGraph() {
     };
   }, []);
 
+  const nodesRef = useRef(nodes);
+  nodesRef.current = nodes;
+  const currentPanRef = useRef(pan);
+  currentPanRef.current = pan;
+  const lastNodeDragPosRef = useRef({ x: 0, y: 0 });
+
   // ==========================================
   // PRECISE CENTERING & AUTO-FIT TO SCREEN
   // ==========================================
-  const fitGraphToScreen = useCallback((nodeList = nodes) => {
-    const targetNodes = (nodeList && nodeList.length > 0) ? nodeList : nodes;
+  const fitGraphToScreen = useCallback((nodeList) => {
+    const targetNodes = (nodeList && nodeList.length > 0) ? nodeList : nodesRef.current;
     if (!targetNodes || targetNodes.length === 0) return;
 
     const w = canvasContainerRef.current?.clientWidth || dimensions.width || 1000;
@@ -488,12 +494,18 @@ export default function IntelligenceGraph() {
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
 
+    const newX = Math.round(w / 2 - centerX * safeZoom);
+    const newY = Math.round(h / 2 - centerY * safeZoom);
+
     setZoom(safeZoom);
-    setPan({
-      x: Math.round(w / 2 - centerX * safeZoom),
-      y: Math.round(h / 2 - centerY * safeZoom)
-    });
-  }, [nodes, dimensions]);
+    setPan({ x: newX, y: newY });
+    panRef.current = { x: newX, y: newY };
+    currentPanRef.current = { x: newX, y: newY };
+
+    if (viewportRef.current) {
+      viewportRef.current.setAttribute('transform', `translate(${newX}, ${newY}) scale(${safeZoom})`);
+    }
+  }, [dimensions]);
 
   // ==========================================
   // SMART MULTI-RING COLLISION-FREE LAYOUT
@@ -674,7 +686,7 @@ export default function IntelligenceGraph() {
     if (!isDemoMode) {
       loadDynamicGraph();
     }
-  }, [loadDynamicGraph, isDemoMode]);
+  }, [caseId, isDemoMode]);
 
   // Fallback demo loader
   const loadDemoData = () => {
@@ -1076,7 +1088,7 @@ export default function IntelligenceGraph() {
     isPanningRef.current = true;
     hasMovedRef.current = false;
     pointerStartRef.current = { x: e.clientX, y: e.clientY };
-    panStartPosRef.current = { x: panRef.current.x, y: panRef.current.y };
+    panStartPosRef.current = { x: currentPanRef.current.x, y: currentPanRef.current.y };
     setIsPanning(true);
   };
 
@@ -1085,11 +1097,13 @@ export default function IntelligenceGraph() {
     draggingNodeRef.current = nodeId;
     hasMovedRef.current = false;
     pointerStartRef.current = { x: e.clientX, y: e.clientY };
+    lastNodeDragPosRef.current = { x: nodeX, y: nodeY };
 
     if (canvasContainerRef.current) {
       const rect = canvasContainerRef.current.getBoundingClientRect();
-      const mouseGraphX = (e.clientX - rect.left - panRef.current.x) / zoomRef.current;
-      const mouseGraphY = (e.clientY - rect.top - panRef.current.y) / zoomRef.current;
+      const currentPan = currentPanRef.current;
+      const mouseGraphX = (e.clientX - rect.left - currentPan.x) / zoomRef.current;
+      const mouseGraphY = (e.clientY - rect.top - currentPan.y) / zoomRef.current;
       dragOffsetRef.current = {
         x: mouseGraphX - nodeX,
         y: mouseGraphY - nodeY
@@ -1102,18 +1116,35 @@ export default function IntelligenceGraph() {
     setDraggingNodeId(null);
   };
 
-  // High-performance window-level listener with RAF for buttery-smooth 120fps motion
-  useEffect(() => {
-    let animFrameId = null;
+  // Dedicated Canvas Nudge/Move Function for Arrow Keys & Directional Buttons
+  const moveCanvas = useCallback((dx, dy) => {
+    setPan(prev => {
+      const nextX = prev.x + dx;
+      const nextY = prev.y + dy;
+      panRef.current = { x: nextX, y: nextY };
+      currentPanRef.current = { x: nextX, y: nextY };
+      if (viewportRef.current) {
+        viewportRef.current.setAttribute(
+          'transform',
+          `translate(${nextX}, ${nextY}) scale(${zoomRef.current})`
+        );
+      }
+      return { x: nextX, y: nextY };
+    });
+  }, []);
 
+  // High-performance window-level listener with zero-lag DOM updates
+  useEffect(() => {
     const onWindowPointerMove = (e) => {
       if (isPanningRef.current && !isLockedRef.current) {
         const dx = e.clientX - pointerStartRef.current.x;
         const dy = e.clientY - pointerStartRef.current.y;
-        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasMovedRef.current = true;
+        if (Math.abs(dx) > 2 || Math.abs(dy) > 2) hasMovedRef.current = true;
 
         const newX = Math.round(panStartPosRef.current.x + dx);
         const newY = Math.round(panStartPosRef.current.y + dy);
+        currentPanRef.current = { x: newX, y: newY };
+        panRef.current = { x: newX, y: newY };
 
         // Instant hardware-accelerated transform update on the SVG viewport group
         if (viewportRef.current) {
@@ -1122,50 +1153,32 @@ export default function IntelligenceGraph() {
             `translate(${newX}, ${newY}) scale(${zoomRef.current})`
           );
         }
-
-        // Throttle React state update to animation frames for zero CPU starvation
-        if (!animFrameId) {
-          animFrameId = requestAnimationFrame(() => {
-            setPan({ x: newX, y: newY });
-            animFrameId = null;
-          });
-        }
       } else if (draggingNodeRef.current && canvasContainerRef.current) {
         const dx = e.clientX - pointerStartRef.current.x;
         const dy = e.clientY - pointerStartRef.current.y;
         if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasMovedRef.current = true;
 
         const rect = canvasContainerRef.current.getBoundingClientRect();
-        const currentPan = panRef.current;
+        const currentPan = currentPanRef.current;
         const currentZoom = zoomRef.current;
         const mouseGraphX = (e.clientX - rect.left - currentPan.x) / currentZoom;
         const mouseGraphY = (e.clientY - rect.top - currentPan.y) / currentZoom;
         const newX = Math.round(mouseGraphX - dragOffsetRef.current.x);
         const newY = Math.round(mouseGraphY - dragOffsetRef.current.y);
+        lastNodeDragPosRef.current = { x: newX, y: newY };
 
         const currentDragId = draggingNodeRef.current;
-        if (!animFrameId) {
-          animFrameId = requestAnimationFrame(() => {
-            setNodes(prev =>
-              prev.map(n => (n.id === currentDragId ? { ...n, x: newX, y: newY } : n))
-            );
-            animFrameId = null;
-          });
+        const nodeEl = document.querySelector(`[data-node-id="${currentDragId}"]`);
+        if (nodeEl) {
+          nodeEl.setAttribute('transform', `translate(${newX}, ${newY})`);
         }
       }
     };
 
     const onWindowPointerUp = (e) => {
-      if (animFrameId) {
-        cancelAnimationFrame(animFrameId);
-        animFrameId = null;
-      }
-
       if (isPanningRef.current) {
-        const dx = e.clientX - pointerStartRef.current.x;
-        const dy = e.clientY - pointerStartRef.current.y;
-        const finalX = Math.round(panStartPosRef.current.x + dx);
-        const finalY = Math.round(panStartPosRef.current.y + dy);
+        const finalX = currentPanRef.current.x;
+        const finalY = currentPanRef.current.y;
         setPan({ x: finalX, y: finalY });
         isPanningRef.current = false;
         setIsPanning(false);
@@ -1176,8 +1189,16 @@ export default function IntelligenceGraph() {
         draggingNodeRef.current = null;
         setDraggingNodeId(null);
 
-        // If the pointer barely moved, it's an intentional click! Open details!
-        if (!hasMovedRef.current) {
+        if (hasMovedRef.current) {
+          // Permanently commit the dragged node position so it stays where placed
+          const finalPos = lastNodeDragPosRef.current;
+          if (finalPos && finalPos.x !== undefined) {
+            setNodes(prev =>
+              prev.map(n => (n.id === nodeId ? { ...n, x: finalPos.x, y: finalPos.y } : n))
+            );
+          }
+        } else {
+          // Intentional click! Open details dialog!
           setSelectedNodeId(nodeId);
           setSelectedEdgeId(null);
           setIsDetailsOpen(true);
@@ -1190,7 +1211,6 @@ export default function IntelligenceGraph() {
     window.addEventListener('pointercancel', onWindowPointerUp);
 
     return () => {
-      if (animFrameId) cancelAnimationFrame(animFrameId);
       window.removeEventListener('pointermove', onWindowPointerMove);
       window.removeEventListener('pointerup', onWindowPointerUp);
       window.removeEventListener('pointercancel', onWindowPointerUp);
@@ -1198,126 +1218,126 @@ export default function IntelligenceGraph() {
   }, []);
 
   // ==========================================
-  // KEYBOARD SHORTCUTS ENGINE
+  // KEYBOARD SHORTCUTS ENGINE (ARROW KEYS & HOTKEYS)
   // ==========================================
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      // Do not trigger hotkeys when typing in forms
-      const targetTag = e.target.tagName?.toLowerCase();
-      if (targetTag === 'input' || targetTag === 'textarea' || targetTag === 'select') {
-        if (e.key === 'Escape') {
-          e.target.blur();
-          setSearchQuery('');
-        }
-        return;
+  const handleKeyDown = useCallback((e) => {
+    // Do not trigger hotkeys when typing in search or input fields
+    const targetTag = e.target.tagName?.toLowerCase();
+    if (targetTag === 'input' || targetTag === 'textarea' || targetTag === 'select') {
+      if (e.key === 'Escape') {
+        e.target.blur();
+        setSearchQuery('');
       }
+      return;
+    }
 
-      switch (e.key) {
-        case '+':
-        case '=':
-          e.preventDefault();
-          applyZoom(1.2);
-          break;
-        case '-':
-        case '_':
-          e.preventDefault();
-          applyZoom(0.83);
-          break;
-        case '0':
-        case 'r':
-        case 'R':
+    switch (e.key) {
+      case '+':
+      case '=':
+        e.preventDefault();
+        applyZoom(1.2);
+        break;
+      case '-':
+      case '_':
+        e.preventDefault();
+        applyZoom(0.83);
+        break;
+      case '0':
+      case 'r':
+      case 'R':
+        e.preventDefault();
+        fitGraphToScreen();
+        break;
+      case 'f':
+      case 'F':
+        if (!e.ctrlKey && !e.metaKey) {
           e.preventDefault();
           fitGraphToScreen();
-          break;
-        case 'f':
-        case 'F':
-          if (!e.ctrlKey && !e.metaKey) {
-            e.preventDefault();
-            fitGraphToScreen();
-          }
-          break;
-        case 'ArrowUp':
-        case 'w':
-        case 'W':
-          e.preventDefault();
-          setPan(p => ({ ...p, y: p.y + 40 }));
-          break;
-        case 'ArrowDown':
-        case 's':
-        case 'S':
-          e.preventDefault();
-          setPan(p => ({ ...p, y: p.y - 40 }));
-          break;
-        case 'ArrowLeft':
-        case 'a':
-        case 'A':
-          e.preventDefault();
-          setPan(p => ({ ...p, x: p.x + 40 }));
-          break;
-        case 'ArrowRight':
-        case 'd':
-        case 'D':
-          e.preventDefault();
-          setPan(p => ({ ...p, x: p.x - 40 }));
-          break;
-        case 'Escape':
-          e.preventDefault();
-          setSelectedNodeId(null);
-          setSelectedEdgeId(null);
-          setIsDetailsOpen(false);
-          setSearchQuery('');
-          setIsAddEntityOpen(false);
-          setShowAllRelModal(false);
-          setIsShortcutsOpen(false);
-          break;
-        case 'i':
-        case 'I':
-          e.preventDefault();
-          setIsDetailsOpen(prev => !prev);
-          break;
-        case 'l':
-        case 'L':
-          e.preventDefault();
-          setIsLocked(prev => !prev);
-          break;
-        case 'h':
-        case 'H':
-          e.preventDefault();
-          setShowLabels(prev => !prev);
-          break;
-        case 't':
-        case 'T':
-          e.preventDefault();
-          setIsDarkMode(prev => !prev);
-          break;
-        case '1':
-          e.preventDefault();
-          handleSwitchLayout('concentric');
-          break;
-        case '2':
-          e.preventDefault();
-          handleSwitchLayout('orbit');
-          break;
-        case '3':
-          e.preventDefault();
-          handleSwitchLayout('clustered');
-          break;
-        case '/':
-          e.preventDefault();
-          searchInputRef.current?.focus();
-          break;
-        case '?':
-          e.preventDefault();
-          setIsShortcutsOpen(prev => !prev);
-          break;
-        default:
-          break;
-      }
-    };
+        }
+        break;
+      case 'ArrowUp':
+      case 'w':
+      case 'W':
+        e.preventDefault();
+        moveCanvas(0, 60);
+        break;
+      case 'ArrowDown':
+      case 's':
+      case 'S':
+        e.preventDefault();
+        moveCanvas(0, -60);
+        break;
+      case 'ArrowLeft':
+      case 'a':
+      case 'A':
+        e.preventDefault();
+        moveCanvas(60, 0);
+        break;
+      case 'ArrowRight':
+      case 'd':
+      case 'D':
+        e.preventDefault();
+        moveCanvas(-60, 0);
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setSelectedNodeId(null);
+        setSelectedEdgeId(null);
+        setIsDetailsOpen(false);
+        setSearchQuery('');
+        setIsAddEntityOpen(false);
+        setShowAllRelModal(false);
+        setIsShortcutsOpen(false);
+        break;
+      case 'i':
+      case 'I':
+        e.preventDefault();
+        setIsDetailsOpen(prev => !prev);
+        break;
+      case 'l':
+      case 'L':
+        e.preventDefault();
+        setIsLocked(prev => !prev);
+        break;
+      case 'h':
+      case 'H':
+        e.preventDefault();
+        setShowLabels(prev => !prev);
+        break;
+      case 't':
+      case 'T':
+        e.preventDefault();
+        setIsDarkMode(prev => !prev);
+        break;
+      case '1':
+        e.preventDefault();
+        handleSwitchLayout('concentric');
+        break;
+      case '2':
+        e.preventDefault();
+        handleSwitchLayout('orbit');
+        break;
+      case '3':
+        e.preventDefault();
+        handleSwitchLayout('clustered');
+        break;
+      case '/':
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        break;
+      case '?':
+        e.preventDefault();
+        setIsShortcutsOpen(prev => !prev);
+        break;
+      default:
+        break;
+    }
+  }, [applyZoom, fitGraphToScreen, handleSwitchLayout, moveCanvas]);
 
+  useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [applyZoom, fitGraphToScreen, handleSwitchLayout]);
+  }, [handleKeyDown]);
 
   // Reset Filters & Re-Fit View
   const handleResetFiltersAndLayout = () => {
@@ -1929,7 +1949,8 @@ export default function IntelligenceGraph() {
         <div
           ref={canvasContainerRef}
           id="graph-canvas-bg"
-          className="flex-1 relative overflow-hidden cursor-grab active:cursor-grabbing select-none"
+          tabIndex={0}
+          className="flex-1 relative overflow-hidden cursor-grab active:cursor-grabbing select-none outline-none"
           style={{
             backgroundColor: theme.canvasBg,
             backgroundImage: `radial-gradient(${theme.gridDot} 1px, transparent 1px)`,
@@ -1937,6 +1958,7 @@ export default function IntelligenceGraph() {
             touchAction: 'none'
           }}
           onPointerDown={handlePointerDownCanvas}
+          onKeyDown={handleKeyDown}
           onWheel={handleWheel}
           onDoubleClick={(e) => {
             e.preventDefault();
@@ -2308,28 +2330,28 @@ export default function IntelligenceGraph() {
             {/* Directional Canvas Pan Controls */}
             <div className="flex items-center gap-0.5">
               <button
-                onClick={() => setPan(p => ({ ...p, x: p.x + 80 }))}
+                onClick={() => moveCanvas(80, 0)}
                 title="Pan Left (A or Left Arrow)"
                 className={`p-1.5 rounded-lg ${theme.buttonBg} hover:${theme.buttonHover} ${theme.textSecondary} hover:${theme.textPrimary} transition`}
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
               </button>
               <button
-                onClick={() => setPan(p => ({ ...p, y: p.y + 80 }))}
+                onClick={() => moveCanvas(0, 80)}
                 title="Pan Up (W or Up Arrow)"
                 className={`p-1.5 rounded-lg ${theme.buttonBg} hover:${theme.buttonHover} ${theme.textSecondary} hover:${theme.textPrimary} transition`}
               >
                 <ArrowUp className="w-3.5 h-3.5" />
               </button>
               <button
-                onClick={() => setPan(p => ({ ...p, y: p.y - 80 }))}
+                onClick={() => moveCanvas(0, -80)}
                 title="Pan Down (S or Down Arrow)"
                 className={`p-1.5 rounded-lg ${theme.buttonBg} hover:${theme.buttonHover} ${theme.textSecondary} hover:${theme.textPrimary} transition`}
               >
                 <ArrowDown className="w-3.5 h-3.5" />
               </button>
               <button
-                onClick={() => setPan(p => ({ ...p, x: p.x - 80 }))}
+                onClick={() => moveCanvas(-80, 0)}
                 title="Pan Right (D or Right Arrow)"
                 className={`p-1.5 rounded-lg ${theme.buttonBg} hover:${theme.buttonHover} ${theme.textSecondary} hover:${theme.textPrimary} transition`}
               >
