@@ -1,14 +1,87 @@
 export const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: "dashboard" },
-  { to: "/cases", label: "Case Management", icon: "cases" },
-  { to: "/data-sources", label: "Data Sources", icon: "sources" },
+  { to: "/cases", label: "Cases", icon: "cases" },
+  { to: "/alerts", label: "Alerts", icon: "alerts", badge: 8 },
   { to: "/entities", label: "Entities", icon: "entities" },
-  { to: "/graph", label: "Intelligence Graph", icon: "graph" },
-  { to: "/map", label: "Geospatial Map", icon: "map" },
+  { to: "/graph", label: "Graph Explorer", icon: "graph" },
   { to: "/timeline", label: "Timeline", icon: "timeline" },
-  { to: "/alerts", label: "Alerts", icon: "alerts", badge: 12 },
   { to: "/reports", label: "Reports", icon: "reports" },
+  { to: "/data-sources", label: "Data Sources", icon: "sources" },
+  { to: "/map", label: "Analytics", icon: "map" },
   { to: "/custody", label: "Chain of Custody", icon: "custody" },
+];
+
+export const AI_ENGINE_NAV = [
+  { to: "/anomaly-engine", label: "Adaptive Anomaly Engine", icon: "anomaly", activeColor: "purple", badge: "AIL" },
+  { to: "/anomaly-engine?tab=insights", label: "Model Insights", icon: "insights" },
+  { to: "/anomaly-engine?tab=feedback", label: "Feedback Loop", icon: "feedback" },
+];
+
+export const SYSTEM_NAV = [
+  { to: "/settings", label: "Settings", icon: "settings" },
+  { to: "/users-roles", label: "Users & Roles", icon: "users" },
+];
+
+export const FRAUD_SCENARIOS = {
+  'Bank Fraud': {
+    name: 'Bank Fraud',
+    description: 'High volume & rapid transactions with layering behavior.',
+    weights: { behavior: 60, network: 25, rules: 15 },
+    contextualAdjustment: 3,
+    avgTxn: '₹12,450',
+    maxTxn: '₹25,000',
+    todayDeviation: '4.8σ',
+  },
+  'Crypto Laundering': {
+    name: 'Crypto Laundering',
+    description: 'Rapid fiat off-ramping into OTC USDT and peer-to-peer accounts.',
+    weights: { behavior: 35, network: 50, rules: 15 },
+    contextualAdjustment: 5,
+    avgTxn: '₹45,200',
+    maxTxn: '₹1,50,000',
+    todayDeviation: '5.2σ',
+  },
+  'Cyber Extortion': {
+    name: 'Cyber Extortion',
+    description: 'Coordinated phishing campaigns with sudden mule account fan-out.',
+    weights: { behavior: 40, network: 30, rules: 30 },
+    contextualAdjustment: 4,
+    avgTxn: '₹8,900',
+    maxTxn: '₹40,000',
+    todayDeviation: '3.9σ',
+  },
+  'Hawala Network': {
+    name: 'Hawala Network',
+    description: 'Informal book-transfer with codeword tokens and courier handoffs.',
+    weights: { behavior: 30, network: 45, rules: 25 },
+    contextualAdjustment: 6,
+    avgTxn: '₹95,000',
+    maxTxn: '₹5,00,000',
+    todayDeviation: '6.1σ',
+  },
+};
+
+export const CODEWORD_CATEGORIES = [
+  {
+    category: 'Hawala & Token Codes',
+    color: '#8B5CF6',
+    words: ['chennai-express', 'angadia', 'token', 'parchi', 'chithi', 'courier', 'cashout', 'hawala']
+  },
+  {
+    category: 'Mule & Commission Terms',
+    color: '#EF4444',
+    words: ['commission', 'agent cut', 'mule rent', 'drop', 'cut', 'split', 'layering', 'funnel']
+  },
+  {
+    category: 'Crypto P2P & OTC',
+    color: '#3B82F6',
+    words: ['usdt', 'binance', 'p2p', 'trc20', 'voucher', 'otc', 'crypto swap', 'cold wallet']
+  },
+  {
+    category: 'Urgency & Evasion',
+    color: '#F59E0B',
+    words: ['urgent', 'freeze', 'bypass', 'immediate', 'clear fast', 'atm limit', 'sim swap']
+  }
 ];
 
 export const PIPELINE_STEPS = [

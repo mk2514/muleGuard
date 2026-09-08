@@ -16,6 +16,7 @@ import Output from './pages/Output';
 import Preprocessing from './pages/Preprocessing';
 import Normalization from './pages/Normalization';
 import Enrichment from './pages/Enrichment';
+import AdaptiveAnomalyEngine from './pages/AdaptiveAnomalyEngine';
 
 function Protected({ children }) {
   if (!isAuthenticated()) return <Navigate to="/login" replace />;
@@ -42,6 +43,7 @@ export default function App() {
         <Route path="/data-sources" element={<DataSources />} />
         <Route path="/entities" element={<Entities />} />
         <Route path="/graph" element={<IntelligenceGraph />} />
+        <Route path="/anomaly-engine" element={<AdaptiveAnomalyEngine />} />
         <Route path="/map" element={<GeospatialMap />} />
         <Route path="/timeline" element={<Timeline />} />
         <Route path="/preprocessing" element={<Preprocessing />} />

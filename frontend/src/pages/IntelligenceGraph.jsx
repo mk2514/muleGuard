@@ -1918,6 +1918,16 @@ export default function IntelligenceGraph() {
                 )}
               </button>
 
+              {/* Quick Jump to Adaptive Anomaly Engine */}
+              <button
+                onClick={() => navigate(`/anomaly-engine?caseId=${caseId}`)}
+                title="Open Adaptive Anomaly Engine (AIL)"
+                className="px-2.5 py-1 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 transition flex items-center gap-1.5 shadow-sm"
+              >
+                <Zap className="w-3.5 h-3.5 text-amber-300" />
+                <span>Anomaly Engine</span>
+              </button>
+
               <button
                 onClick={() => setIsDarkMode(!isDarkMode)}
                 title="Toggle Theme (T)"
