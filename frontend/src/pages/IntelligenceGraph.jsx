@@ -712,6 +712,19 @@ export default function IntelligenceGraph() {
   // SYNTHESIZE NODES FROM REAL RESOLVED ENTITIES
   // ==========================================
   function synthesizeNodes(entities, records) {
+    const LEA_EXCLUSION_KEYWORDS = [
+      'police', 'pipeline', 'chandigarh', 'cyber cell', 'investigating', 'evidence_pipeline',
+      'unknown_src', 'unknown_tgt', 'extracted_multi_format', 'generic_evidence', 'tabular_evidence'
+    ];
+
+    const isLEAOrArtifact = (val) => {
+      const v = String(val || '').toLowerCase().trim();
+      return LEA_EXCLUSION_KEYWORDS.some(k => v.includes(k));
+    };
+
+    // Filter out LEA / pipeline artifacts so they are NEVER nodes in the criminal intelligence graph
+    const filteredEntities = entities.filter(ent => !isLEAOrArtifact(ent.canonical_value));
+
     const frequencyMap = {};
     records.forEach(r => {
       Object.values(r).forEach(v => {
@@ -721,11 +734,12 @@ export default function IntelligenceGraph() {
       });
     });
 
-    // Detect suspect by centrality & frequency
+    // Detect genuine suspect by centrality & frequency (excluding police / pipeline)
     let highestScore = -1;
     let primarySuspectId = null;
 
-    entities.forEach(ent => {
+    // First check real Person entities
+    filteredEntities.forEach(ent => {
       const isPerson = ent.type?.toLowerCase().includes('person') || ent.type?.toLowerCase() === 'user';
       if (isPerson) {
         const val = String(ent.canonical_value).trim().toLowerCase();
@@ -737,7 +751,19 @@ export default function IntelligenceGraph() {
       }
     });
 
-    return entities.map((ent, idx) => {
+    // If no Person entity present, select the most connected Mule/Bank Account or high-frequency entity
+    if (!primarySuspectId && filteredEntities.length > 0) {
+      filteredEntities.forEach(ent => {
+        const val = String(ent.canonical_value).trim().toLowerCase();
+        const score = (frequencyMap[val] || 0) * 2 + (ent.linked_records?.length || 0) * 2 + (ent.related_canonical_ids?.length || 0) * 3;
+        if (score > highestScore) {
+          highestScore = score;
+          primarySuspectId = ent.canonical_id;
+        }
+      });
+    }
+
+    return filteredEntities.map((ent, idx) => {
       let mappedType = 'Person';
       const rawType = (ent.type || '').toLowerCase();
       if (rawType.includes('phone') || rawType.includes('mobile')) mappedType = 'Phone Number';
@@ -748,7 +774,7 @@ export default function IntelligenceGraph() {
       else if (rawType.includes('ip')) mappedType = 'IP Address';
       else if (rawType.includes('org') || rawType.includes('company')) mappedType = 'Organization';
 
-      const isSuspect = ent.canonical_id === primarySuspectId || (mappedType === 'Person' && idx === 0);
+      const isSuspect = ent.canonical_id === primarySuspectId;
       const isAssociate = mappedType === 'Person' && !isSuspect;
 
       const recordCount = ent.linked_records?.length || 1;
@@ -859,10 +885,14 @@ export default function IntelligenceGraph() {
       }
     });
 
-    // Add co-occurrences resolved from Entity Resolution
+    // Add co-occurrences resolved from Entity Resolution (only between valid active nodes)
+    const validNodeIds = new Set(dynamicNodes.map(n => n.id));
+
     entities.forEach((ent, i) => {
+      if (!validNodeIds.has(ent.canonical_id)) return;
       if (ent.related_canonical_ids && Array.isArray(ent.related_canonical_ids)) {
         ent.related_canonical_ids.forEach((relId, j) => {
+          if (!validNodeIds.has(relId)) return;
           const key1 = `${ent.canonical_id}->${relId}`;
           const key2 = `${relId}->${ent.canonical_id}`;
 

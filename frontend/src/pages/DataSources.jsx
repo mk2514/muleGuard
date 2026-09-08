@@ -25,6 +25,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { processImageFile } from '../utils/ocrProcessor';
+import * as XLSX from 'xlsx';
 
 export default function DataSource() {
   const navigate = useNavigate();
@@ -192,37 +193,114 @@ export default function DataSource() {
     let structured = { chats: [], bankDetails: {}, telecomDetails: {} };
     let mediaDetails = null;
 
+    // Helper to find column values based on flexible naming
+    const extractField = (row, candidates, fallback = '') => {
+      const keys = Object.keys(row);
+      for (const cand of candidates) {
+        const matchingKey = keys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cand.toLowerCase().replace(/[^a-z0-9]/g, '')));
+        if (matchingKey && row[matchingKey] !== undefined && row[matchingKey] !== null && String(row[matchingKey]).trim() !== '') {
+          return String(row[matchingKey]).trim();
+        }
+      }
+      return fallback;
+    };
+
+    // 1. Tabular Data (CSV, XLSX, XLS) - Parse each transaction row
+    if (['csv', 'xlsx', 'xls'].includes(ext)) {
+      try {
+        const buffer = await file.arrayBuffer();
+        const wb = XLSX.read(buffer, { type: 'array' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const rows = XLSX.utils.sheet_to_json(ws);
+
+        if (rows && rows.length > 0) {
+          return rows.map((row, rIdx) => {
+            const src = extractField(row, [
+              'sender_name', 'sender_account', 'sender', 'from_account', 'from', 'payer',
+              'calling_no', 'calling_number', 'a_party', 'source_account', 'source_ip', 'account_number', 'upi_id'
+            ], `SRC_${rIdx + 1}`);
+
+            const tgt = extractField(row, [
+              'beneficiary_name', 'beneficiary_account', 'beneficiary', 'bene', 'to_account', 'to', 'payee',
+              'called_no', 'called_number', 'b_party', 'dest_account', 'destination_ip'
+            ], `TGT_${rIdx + 1}`);
+
+            const amt = extractField(row, ['amount', 'txn_amount', 'transaction_amount', 'amt', 'value']);
+            const time = extractField(row, ['timestamp', 'txn_date', 'date', 'created_at', 'call_date', 'time'], new Date().toISOString().replace('T', ' ').slice(0, 19));
+            const loc = extractField(row, ['location', 'city', 'state', 'cell_id', 'atm_location', 'address']);
+
+            return {
+              event_id: row.event_id || row.transaction_id || `EVT-${Date.now()}-${rIdx}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`,
+              source_file: file.name,
+              file_extension: ext,
+              type: formData.sourceType || 'TRANSACTION',
+              source: src,
+              target: tgt,
+              amount: amt,
+              timestamp: time,
+              location: loc || 'NOT_AVAILABLE',
+              investigating_agency: formData.sourceOrg || 'Chandigarh Police Dept',
+              ...row
+            };
+          });
+        }
+      } catch (err) {
+        console.warn('XLSX parsing failed, falling back to text parsing:', err);
+      }
+    }
+
+    // 2. Structured JSON
+    if (ext === 'json') {
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        const rows = Array.isArray(parsed) ? parsed : [parsed];
+        if (rows.length > 0) {
+          return rows.map((row, rIdx) => ({
+            event_id: row.event_id || row.transaction_id || `EVT-${Date.now()}-${rIdx}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`,
+            source_file: file.name,
+            file_extension: 'json',
+            type: formData.sourceType || 'JSON_DATA',
+            source: row.source || row.sender || row.sender_name || `SRC_${rIdx + 1}`,
+            target: row.target || row.beneficiary || row.receiver || `TGT_${rIdx + 1}`,
+            timestamp: row.timestamp || new Date().toISOString().replace('T', ' ').slice(0, 19),
+            investigating_agency: formData.sourceOrg || 'Chandigarh Police Dept',
+            ...row
+          }));
+        }
+      } catch (e) {
+        console.warn('JSON parse error:', e);
+      }
+    }
+
+    // 3. Image OCR and Structured Forensic Extraction
     if (file.type.startsWith('image/') || ['jpg', 'jpeg', 'png', 'bmp'].includes(ext)) {
-      // 1. Image OCR and Structured Forensic Extraction
       const ocrResult = await processImageFile(file);
       rawText = ocrResult.raw_text || '';
       structured = ocrResult.structured || structured;
 
     } else if (file.type.startsWith('video/') || ['mp4', 'avi', 'mov', 'mkv'].includes(ext)) {
-      // 2. Video Analysis & Metadata Extraction
+      // 4. Video Analysis & Metadata Extraction
       mediaDetails = await extractVideoDetails(file);
       rawText = `[VIDEO_EVIDENCE_FILE] Name: ${file.name}, Duration: ${mediaDetails.duration}, Resolution: ${mediaDetails.resolution}`;
 
-    } else if (['csv', 'txt', 'json', 'log'].includes(ext)) {
-      // 3. Text, CSV, and JSON Direct Content Extraction
+    } else if (['txt', 'log'].includes(ext)) {
+      // 5. Plain Text / Log Extraction
       rawText = await file.text();
-      if (ext === 'json') {
-        try {
-          const parsedJson = JSON.parse(rawText);
-          rawText = JSON.stringify(parsedJson, null, 2);
-        } catch (e) {
-          // Keep raw text if invalid JSON
-        }
-      }
 
-    } else if (['pdf', 'doc', 'docx', 'xlsx', 'xls'].includes(ext)) {
-      // 4. Document & Binary File Metadata Preparation
+    } else if (['pdf', 'doc', 'docx'].includes(ext)) {
+      // 6. Document Metadata
       rawText = `[DOCUMENT_EVIDENCE] File: ${file.name}, Size: ${(file.size / 1024).toFixed(2)} KB, Format: ${ext.toUpperCase()}`;
     } else {
       rawText = `[GENERIC_EVIDENCE] File: ${file.name}, Size: ${(file.size / 1024).toFixed(2)} KB`;
     }
 
-    return {
+    // Determine sensible extracted sender/target without ever using police dept or pipeline
+    const detectedSource = structured.bankDetails?.accountNumber || structured.telecomDetails?.callingNumber || 'SUSPECT_SOURCE';
+    const detectedTarget = structured.bankDetails?.beneficiaryAccount || structured.telecomDetails?.calledNumber || 'DEST_BENEFICIARY';
+
+    return [{
       event_id: `EVT-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
       source_file: file.name,
       file_extension: ext,
@@ -232,10 +310,11 @@ export default function DataSource() {
       bank_entities: structured.bankDetails || {},
       telecom_entities: structured.telecomDetails || {},
       media_metadata: mediaDetails,
-      source: formData.sourceOrg || 'EXTRACTED_MULTI_FORMAT',
-      target: 'EVIDENCE_PIPELINE',
+      source: detectedSource,
+      target: detectedTarget,
+      investigating_agency: formData.sourceOrg || 'Chandigarh Police Dept',
       timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19)
-    };
+    }];
   };
 
   // Start Ingestion: Process files across all formats & sync payload
@@ -252,8 +331,12 @@ export default function DataSource() {
       const processedRecords = [];
 
       for (let i = 0; i < selectedFiles.length; i++) {
-        const record = await processAnyFile(selectedFiles[i]);
-        processedRecords.push(record);
+        const fileResult = await processAnyFile(selectedFiles[i]);
+        if (Array.isArray(fileResult)) {
+          processedRecords.push(...fileResult);
+        } else if (fileResult) {
+          processedRecords.push(fileResult);
+        }
 
         // Update progress bar
         setUploadProgress(10 + Math.round(((i + 1) / selectedFiles.length) * 50));
@@ -326,9 +409,10 @@ export default function DataSource() {
       console.error("Ingestion failed:", error);
 
       // Local fallback payload handling if backend is unattached
-      const fallbackRecords = await Promise.all(
+      const fallbackRecordsArrays = await Promise.all(
         selectedFiles.map((file) => processAnyFile(file))
       );
+      const fallbackRecords = fallbackRecordsArrays.flat();
 
       const fallbackPayload = {
         status: 'INGESTED',

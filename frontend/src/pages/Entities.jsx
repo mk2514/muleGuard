@@ -116,6 +116,34 @@ export default function Entities() {
         return rawEntitiesMap.get(key).canonical_id;
       };
 
+      const LEA_AND_SYSTEM_BLACKLIST = [
+        'chandigarh police',
+        'chandigarh police dept',
+        'chandigarh police department',
+        'police',
+        'police dept',
+        'police department',
+        'evidence_pipeline',
+        'extracted_multi_format',
+        'unknown_src',
+        'unknown_tgt',
+        'system',
+        'cyber cell',
+        'fiu-ind',
+        'investigation cell',
+        'investigating agency',
+        'law enforcement',
+        'not_available',
+        'tabular_evidence',
+        'generic_evidence'
+      ];
+
+      const isBlacklisted = (str) => {
+        const s = String(str || '').toLowerCase().trim();
+        if (!s || s.length < 3) return true;
+        return LEA_AND_SYSTEM_BLACKLIST.some(item => s.includes(item));
+      };
+
       // 1. Extract Entities from Records
       records.forEach((record, idx) => {
         const recordId = record.event_id || record._id || `REC-${idx}`;
@@ -124,8 +152,13 @@ export default function Entities() {
         // Dynamically extract from fields based on regex and keys
         Object.entries(record).forEach(([key, val]) => {
           if (!val) return;
-          const strVal = String(val);
+          const strVal = String(val).trim();
           const lowerKey = key.toLowerCase();
+
+          // Skip investigating agency and audit metadata fields
+          if (['investigating_agency', 'source_org', 'agency', 'case_id', 'case_officer', 'evidence'].includes(lowerKey)) {
+            return;
+          }
 
           // Phone detection
           if (lowerKey.includes('phone') || lowerKey.includes('mobile') || /(?:\+91|91)?[\s-]?[6-9]\d{9}\b/.test(strVal)) {
@@ -155,9 +188,9 @@ export default function Entities() {
             const matches = strVal.match(/\b\d{9,18}\b/g) || [];
             matches.forEach(m => recordEntityIds.add(addOrUpdateEntity('Bank Account', m, normalizeBank(m), recordId)));
           }
-          // Person (heuristic based on source/target if not matching others)
-          if (['source', 'target', 'sender_name', 'beneficiary_name'].includes(lowerKey)) {
-             if (strVal.length > 3 && !strVal.includes('@') && !/\d{5,}/.test(strVal)) {
+          // Person (heuristic based on source/target if not matching others, excluding LEA / system)
+          if (['source', 'target', 'sender_name', 'beneficiary_name', 'sender', 'receiver', 'payer', 'payee'].includes(lowerKey)) {
+             if (strVal.length > 3 && !strVal.includes('@') && !/\d{5,}/.test(strVal) && !isBlacklisted(strVal)) {
                recordEntityIds.add(addOrUpdateEntity('Person', strVal, strVal.toUpperCase().trim(), recordId));
              }
           }
