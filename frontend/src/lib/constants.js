@@ -1,26 +1,19 @@
 export const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: "dashboard" },
   { to: "/cases", label: "Cases", icon: "cases" },
-  { to: "/alerts", label: "Alerts", icon: "alerts", badge: 8 },
+  { to: "/data-sources", label: "Data Sources", icon: "sources" },
   { to: "/entities", label: "Entities", icon: "entities" },
   { to: "/graph", label: "Graph Explorer", icon: "graph" },
-  { to: "/timeline", label: "Timeline", icon: "timeline" },
-  { to: "/reports", label: "Reports", icon: "reports" },
-  { to: "/data-sources", label: "Data Sources", icon: "sources" },
+  { to: "/anomaly-engine", label: "Adaptive Anomaly Detection", icon: "anomaly", badge: "AIL" },
   { to: "/map", label: "Analytics", icon: "map" },
   { to: "/custody", label: "Chain of Custody", icon: "custody" },
-];
-
-export const AI_ENGINE_NAV = [
-  { to: "/anomaly-engine", label: "Adaptive Anomaly Engine", icon: "anomaly", activeColor: "purple", badge: "AIL" },
-  { to: "/anomaly-engine?tab=insights", label: "Model Insights", icon: "insights" },
-  { to: "/anomaly-engine?tab=feedback", label: "Feedback Loop", icon: "feedback" },
-];
-
-export const SYSTEM_NAV = [
-  { to: "/settings", label: "Settings", icon: "settings" },
+  { to: "/timeline", label: "Timeline", icon: "timeline" },
+  { to: "/alerts", label: "Alerts", icon: "alerts", badge: 8 },
   { to: "/users-roles", label: "Users & Roles", icon: "users" },
 ];
+
+export const AI_ENGINE_NAV = [];
+export const SYSTEM_NAV = [];
 
 export const FRAUD_SCENARIOS = {
   'Bank Fraud': {

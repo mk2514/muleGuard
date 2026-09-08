@@ -17,6 +17,7 @@ import Preprocessing from './pages/Preprocessing';
 import Normalization from './pages/Normalization';
 import Enrichment from './pages/Enrichment';
 import AdaptiveAnomalyEngine from './pages/AdaptiveAnomalyEngine';
+import UsersRoles from './pages/UsersRoles';
 
 function Protected({ children }) {
   if (!isAuthenticated()) return <Navigate to="/login" replace />;
@@ -53,6 +54,7 @@ export default function App() {
         <Route path="/reports" element={<Reports />} />
         <Route path="/custody" element={<ChainOfCustody />} />
         <Route path="/output" element={<Output />} />
+        <Route path="/users-roles" element={<UsersRoles />} />
       </Route>
       <Route path="*" element={<Navigate to={isAuthenticated() ? "/dashboard" : "/login"} replace />} />
     </Routes>
