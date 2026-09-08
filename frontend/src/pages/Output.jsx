@@ -478,14 +478,6 @@ export default function Output() {
                 <LinkIcon className="h-4 w-4" />
                 <span>Proceed to Entity Resolution</span>
               </button>
-
-              <button
-                onClick={() => navigate(`/graph?caseId=${rawPipelineData?.case_id}`)}
-                className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-semibold rounded-lg hover:from-purple-500 hover:to-indigo-500 flex items-center space-x-2 shadow-md transition-colors"
-              >
-                <Network className="h-4 w-4" />
-                <span>View Intelligence Graph</span>
-              </button>
             </div>
           </div>
 

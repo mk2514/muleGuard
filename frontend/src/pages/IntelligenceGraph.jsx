@@ -3,7 +3,6 @@ import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
   Search,
-  SlidersHorizontal,
   Download,
   Maximize2,
   Minimize2,
@@ -28,28 +27,85 @@ import {
   Sparkles,
   ChevronRight,
   Share2,
-  Eye,
-  EyeOff,
   AlertTriangle,
-  GitBranch,
   Layers,
-  PhoneCall,
-  ArrowRightLeft,
-  Compass,
   FileText,
   Calendar,
-  Filter,
-  CheckSquare,
-  Square,
-  Network
+  Network,
+  GitFork,
+  ArrowRight,
+  Database
 } from 'lucide-react';
 
 // ==========================================
-// PRESET 1: SCREENSHOT REPLICA (Chennai ATM Fraud Case)
+// COLOR CONFIGURATION & VISUAL THEMES
 // ==========================================
-const CHENNAI_NODES = [
+const TYPE_CONFIG = {
+  'Person': {
+    color: '#8B5CF6',
+    glow: 'rgba(139, 92, 246, 0.45)',
+    icon: User,
+    badgeBg: 'bg-purple-950 text-purple-300 border-purple-800'
+  },
+  'Phone Number': {
+    color: '#3B82F6',
+    glow: 'rgba(59, 130, 246, 0.45)',
+    icon: Phone,
+    badgeBg: 'bg-blue-950 text-blue-300 border-blue-800'
+  },
+  'Bank Account': {
+    color: '#10B981',
+    glow: 'rgba(16, 185, 129, 0.45)',
+    icon: Building2,
+    badgeBg: 'bg-emerald-950 text-emerald-300 border-emerald-800'
+  },
+  'Device': {
+    color: '#F97316',
+    glow: 'rgba(249, 115, 22, 0.45)',
+    icon: Smartphone,
+    badgeBg: 'bg-orange-950 text-orange-300 border-orange-800'
+  },
+  'Email': {
+    color: '#A855F7',
+    glow: 'rgba(168, 85, 247, 0.45)',
+    icon: Mail,
+    badgeBg: 'bg-violet-950 text-violet-300 border-violet-800'
+  },
+  'Location': {
+    color: '#14B8A6',
+    glow: 'rgba(20, 184, 166, 0.45)',
+    icon: MapPin,
+    badgeBg: 'bg-teal-950 text-teal-300 border-teal-800'
+  },
+  'IP Address': {
+    color: '#F59E0B',
+    glow: 'rgba(245, 158, 11, 0.45)',
+    icon: Monitor,
+    badgeBg: 'bg-amber-950 text-amber-300 border-amber-800'
+  },
+  'Organization': {
+    color: '#F43F5E',
+    glow: 'rgba(244, 63, 94, 0.45)',
+    icon: Building,
+    badgeBg: 'bg-rose-950 text-rose-300 border-rose-800'
+  }
+};
+
+const RELATIONSHIP_CONFIG = {
+  'Calls / Communicates': { color: '#3B82F6', dashArray: '5 4' },
+  'Transactions': { color: '#10B981', dashArray: '5 4' },
+  'Owns / Uses': { color: '#F97316', dashArray: '5 4' },
+  'Associated With': { color: '#A855F7', dashArray: '3 3' },
+  'Located At': { color: '#14B8A6', dashArray: '5 4' },
+  'Follows / Connected': { color: '#F59E0B', dashArray: '3 3' }
+};
+
+// ==========================================
+// DEMO FALLBACK (Used if no user data uploaded yet)
+// ==========================================
+const DEMO_CONSOLIDATED_NODES = [
   {
-    id: 'ramesh',
+    id: 'DEMO-P1',
     label: 'Ramesh',
     subLabel: '(Suspect)',
     type: 'Person',
@@ -57,143 +113,56 @@ const CHENNAI_NODES = [
     riskScore: 92,
     riskLevel: 'High Risk',
     x: 500,
-    y: 360,
+    y: 340,
     details: {
       entityId: 'PER-1001',
       age: 32,
       gender: 'Male',
       phone: '+91 98765 45210',
       email: 'ramesh23@mail.com',
-      remarks: 'Main suspect in ATM fraud activity across Chennai.',
-      linkedCounts: {
-        'Phone Numbers': 3,
-        'Bank Accounts': 2,
-        'Email Addresses': 1,
-        'Devices': 1,
-        'Locations': 3,
-        'IP Addresses': 1,
-        'Other Persons': 2
-      },
+      remarks: 'Primary suspect in ATM fraud activity and mule network layering.',
+      linkedCounts: { 'Phone Numbers': 2, 'Bank Accounts': 2, 'Email Addresses': 1, 'Devices': 1, 'Locations': 2, 'IP Addresses': 1, 'Other Persons': 2 },
       quickInsight: 'Ramesh is centrally connected to multiple accounts, devices, and locations. High transaction activity and frequent communication observed.'
     }
   },
   {
-    id: 'suresh',
+    id: 'DEMO-P2',
     label: 'Suresh',
     subLabel: '(Associate)',
     type: 'Person',
     role: 'associate',
     riskScore: 78,
     riskLevel: 'High Risk',
-    x: 320,
-    y: 530,
+    x: 300,
+    y: 490,
     details: {
       entityId: 'PER-1002',
-      age: 29,
-      gender: 'Male',
       phone: '+91 98765 43210',
-      email: 'suresh.k@fastmail.com',
-      remarks: 'Primary money mule handler and ATM cash collector.',
-      linkedCounts: { 'Phone Numbers': 1, 'Bank Accounts': 1, 'Email Addresses': 0, 'Devices': 0, 'Locations': 1, 'IP Addresses': 0, 'Other Persons': 2 },
-      quickInsight: 'Suresh operates collection accounts and communicates with Ramesh immediately prior to high-volume ATM withdrawals.'
+      remarks: 'Mule account handler; executes secondary cash withdrawals.',
+      linkedCounts: { 'Phone Numbers': 1, 'Bank Accounts': 1, 'Email Addresses': 0, 'Devices': 0, 'Locations': 1, 'IP Addresses': 0, 'Other Persons': 1 },
+      quickInsight: 'Suresh received 8 layered transfers from Axis Bank XXXX 4578 and coordinated ATM cash extraction.'
     }
   },
   {
-    id: 'arun',
+    id: 'DEMO-P3',
     label: 'Arun',
     subLabel: '(Associate)',
     type: 'Person',
     role: 'associate',
     riskScore: 74,
     riskLevel: 'Medium Risk',
-    x: 680,
-    y: 530,
+    x: 700,
+    y: 490,
     details: {
       entityId: 'PER-1003',
-      age: 26,
-      gender: 'Male',
       phone: '+91 91234 56780',
-      email: 'arun.tech@gmail.com',
-      remarks: 'SIM card supplier and digital banking access point.',
-      linkedCounts: { 'Phone Numbers': 1, 'Bank Accounts': 1, 'Email Addresses': 0, 'Devices': 0, 'Locations': 1, 'IP Addresses': 0, 'Other Persons': 2 },
-      quickInsight: 'Arun facilitated OTP bypass and coordinated secondary cash withdrawals from HDFC mule accounts.'
+      remarks: 'SIM card provider and digital banking access coordinator.',
+      linkedCounts: { 'Phone Numbers': 1, 'Bank Accounts': 1, 'Email Addresses': 0, 'Devices': 0, 'Locations': 1, 'IP Addresses': 0, 'Other Persons': 1 },
+      quickInsight: 'Arun facilitated OTP relay operations and managed HDFC XXXX 9921 cash disbursement.'
     }
   },
   {
-    id: 'phone1',
-    label: '+91 98765 43210',
-    subLabel: '',
-    type: 'Phone Number',
-    role: 'normal',
-    riskScore: 85,
-    riskLevel: 'High Risk',
-    x: 320,
-    y: 210,
-    details: {
-      entityId: 'PH-401',
-      carrier: 'Airtel India',
-      circle: 'Tamil Nadu & Chennai',
-      status: 'Burner SIM (Fake KYC)',
-      callsCount: 142,
-      remarks: 'Direct command channel between Ramesh and Suresh.'
-    }
-  },
-  {
-    id: 'phone2',
-    label: '+91 91234 56780',
-    subLabel: '',
-    type: 'Phone Number',
-    role: 'normal',
-    riskScore: 80,
-    riskLevel: 'High Risk',
-    x: 770,
-    y: 220,
-    details: {
-      entityId: 'PH-402',
-      carrier: 'Jio 5G',
-      circle: 'Chennai Metropolitan',
-      status: 'Active',
-      callsCount: 89,
-      remarks: 'Used during ATM cash layering operations.'
-    }
-  },
-  {
-    id: 'email1',
-    label: 'ramesh23@mail.com',
-    subLabel: '',
-    type: 'Email',
-    role: 'normal',
-    riskScore: 68,
-    riskLevel: 'Medium Risk',
-    x: 480,
-    y: 160,
-    details: {
-      entityId: 'EM-109',
-      domain: 'mail.com',
-      creationDate: '14 Feb 2024',
-      remarks: 'Linked to fake net-banking credential registration.'
-    }
-  },
-  {
-    id: 'device1',
-    label: 'OnePlus 9',
-    subLabel: 'IMEI: 8654 23XX 1123XX',
-    type: 'Device',
-    role: 'normal',
-    riskScore: 88,
-    riskLevel: 'High Risk',
-    x: 600,
-    y: 190,
-    details: {
-      entityId: 'DEV-889',
-      model: 'OnePlus 9 5G (LE2111)',
-      imei: '8654 2390 1123 481',
-      simSlots: 'Dual SIM',
-      remarks: 'Both suspect numbers were alternately active on this single device.'
-    }
-  },
-  {
-    id: 'bank_axis',
+    id: 'DEMO-B1',
     label: 'XXXX 4578',
     subLabel: 'Axis Bank',
     type: 'Bank Account',
@@ -201,456 +170,139 @@ const CHENNAI_NODES = [
     riskScore: 89,
     riskLevel: 'High Risk',
     x: 270,
-    y: 360,
+    y: 330,
     details: {
-      entityId: 'ACC-331',
+      entityId: 'ACC-AX45',
       bankName: 'Axis Bank',
-      branch: 'T. Nagar Branch, Chennai',
-      accountHolder: 'Ramesh (Proxy/Mule)',
+      accountHolder: 'Ramesh (Mule)',
       turnover: '₹42,50,000',
-      remarks: 'Aggregated fraud funds before dispatch to ATM cashouts.'
+      remarks: 'Layering collection account used to aggregate stolen funds.'
     }
   },
   {
-    id: 'bank_hdfc',
+    id: 'DEMO-B2',
     label: 'XXXX 9921',
     subLabel: 'HDFC Bank',
     type: 'Bank Account',
     role: 'normal',
     riskScore: 84,
     riskLevel: 'High Risk',
-    x: 740,
-    y: 370,
+    x: 730,
+    y: 330,
     details: {
-      entityId: 'ACC-332',
+      entityId: 'ACC-HD99',
       bankName: 'HDFC Bank',
-      branch: 'Anna Nagar West, Chennai',
       accountHolder: 'Mule Shell Enterprise',
       turnover: '₹28,10,000',
-      remarks: 'Secondary layer account used for quick UPI disbursements.'
+      remarks: 'Secondary layer account for fast disbursement.'
     }
   },
   {
-    id: 'atm_tnagar',
+    id: 'DEMO-PH1',
+    label: '+91 98765 43210',
+    subLabel: 'Primary Phone',
+    type: 'Phone Number',
+    role: 'normal',
+    riskScore: 85,
+    riskLevel: 'High Risk',
+    x: 340,
+    y: 190,
+    details: { entityId: 'PH-401', carrier: 'Airtel India', remarks: 'High-frequency communication with Suresh.' }
+  },
+  {
+    id: 'DEMO-PH2',
+    label: '+91 91234 56780',
+    subLabel: 'Secondary Phone',
+    type: 'Phone Number',
+    role: 'normal',
+    riskScore: 80,
+    riskLevel: 'High Risk',
+    x: 740,
+    y: 190,
+    details: { entityId: 'PH-402', carrier: 'Jio 5G', remarks: 'Used during ATM cashout runs.' }
+  },
+  {
+    id: 'DEMO-DEV1',
+    label: 'OnePlus 9',
+    subLabel: 'IMEI: 8654 23XX',
+    type: 'Device',
+    role: 'normal',
+    riskScore: 88,
+    riskLevel: 'High Risk',
+    x: 590,
+    y: 180,
+    details: { entityId: 'DEV-889', model: 'OnePlus 9 5G', remarks: 'Both suspect numbers active on this single device.' }
+  },
+  {
+    id: 'DEMO-LOC1',
     label: 'T. Nagar ATM',
     subLabel: 'Chennai',
     type: 'Location',
     role: 'normal',
     riskScore: 95,
     riskLevel: 'High Risk',
-    x: 480,
-    y: 570,
-    details: {
-      entityId: 'LOC-701',
-      locationType: 'Automated Teller Machine',
-      atmId: 'ATM-TN-404',
-      coordinates: '13.0418° N, 80.2341° E',
-      cctvMatches: '3 confirmed camera hits',
-      remarks: 'Epicenter of physical ATM fraud cash extraction.'
-    }
+    x: 500,
+    y: 540,
+    details: { entityId: 'LOC-701', locationType: 'Bank ATM', remarks: 'Epicenter of physical cash extractions.' }
   },
   {
-    id: 'loc_adyar',
-    label: 'Adyar',
-    subLabel: 'Chennai',
-    type: 'Location',
-    role: 'normal',
-    riskScore: 60,
-    riskLevel: 'Medium Risk',
-    x: 320,
-    y: 690,
-    details: {
-      entityId: 'LOC-702',
-      locationType: 'Cell Tower Sector',
-      towerId: 'CHN-ADY-09',
-      remarks: 'First hop location during cash runner transit.'
-    }
-  },
-  {
-    id: 'ip1',
+    id: 'DEMO-IP1',
     label: '103.21.45.67',
     subLabel: 'IP Address',
     type: 'IP Address',
     role: 'normal',
     riskScore: 77,
     riskLevel: 'Medium Risk',
-    x: 480,
-    y: 700,
-    details: {
-      entityId: 'IP-502',
-      isp: 'ACT Fibernet Chennai',
-      proxyVpn: 'Identified SOCKS5 Tunnel',
-      loginsCount: 312,
-      remarks: 'Used to initiate bulk IMPS transfers at 02:00-04:00 AM.'
-    }
-  },
-  {
-    id: 'loc_annanagar',
-    label: 'Anna Nagar',
-    subLabel: 'Chennai',
-    type: 'Location',
-    role: 'normal',
-    riskScore: 65,
-    riskLevel: 'Medium Risk',
-    x: 640,
-    y: 690,
-    details: {
-      entityId: 'LOC-703',
-      locationType: 'Cell Tower Sector',
-      towerId: 'CHN-ANN-02',
-      remarks: 'Safehouse staging area identified from CDR triangulation.'
-    }
-  }
-];
-
-const CHENNAI_EDGES = [
-  // Center Suspect Ramesh Outgoing/Incoming
-  { id: 'e1', source: 'ramesh', target: 'phone1', type: 'Calls / Communicates', label: 'CALLS' },
-  { id: 'e2', source: 'ramesh', target: 'email1', type: 'Associated With', label: 'ASSOCIATED WITH', style: 'dashed' },
-  { id: 'e3', source: 'ramesh', target: 'device1', type: 'Owns / Uses', label: 'USES' },
-  { id: 'e4', source: 'ramesh', target: 'phone2', type: 'Calls / Communicates', label: 'CALLS' },
-  { id: 'e5', source: 'ramesh', target: 'bank_axis', type: 'Owns / Uses', label: 'OWNS' },
-  { id: 'e6', source: 'ramesh', target: 'bank_hdfc', type: 'Owns / Uses', label: 'OWNS' },
-  { id: 'e7', source: 'ramesh', target: 'atm_tnagar', type: 'Located At', label: 'LOCATED AT' },
-
-  // Suresh Collusion
-  { id: 'e8', source: 'bank_axis', target: 'suresh', type: 'Transactions', label: 'TRANSACTIONS' },
-  { id: 'e9', source: 'suresh', target: 'phone1', type: 'Calls / Communicates', label: 'CALLS' },
-  { id: 'e10', source: 'suresh', target: 'ramesh', type: 'Associated With', label: 'ASSOCIATED WITH', style: 'dashed' },
-  { id: 'e11', source: 'suresh', target: 'atm_tnagar', type: 'Located At', label: 'LOCATED AT' },
-
-  // Arun Collusion
-  { id: 'e12', source: 'bank_hdfc', target: 'arun', type: 'Transactions', label: 'TRANSACTIONS' },
-  { id: 'e13', source: 'arun', target: 'phone2', type: 'Calls / Communicates', label: 'CALLS' },
-  { id: 'e14', source: 'arun', target: 'ramesh', type: 'Associated With', label: 'ASSOCIATED WITH', style: 'dashed' },
-  { id: 'e15', source: 'arun', target: 'atm_tnagar', type: 'Located At', label: 'LOCATED AT' },
-
-  // Location and IP Infrastructure
-  { id: 'e16', source: 'atm_tnagar', target: 'loc_adyar', type: 'Follows / Connected', label: 'CONNECTED' },
-  { id: 'e17', source: 'atm_tnagar', target: 'ip1', type: 'Follows / Connected', label: 'CONNECTED' },
-  { id: 'e18', source: 'atm_tnagar', target: 'loc_annanagar', type: 'Follows / Connected', label: 'CONNECTED' }
-];
-
-// ==========================================
-// PRESET 2: PERSON A, B, C MULTI-PERSON SYNDICATE
-// ==========================================
-const PERSON_ABC_NODES = [
-  {
-    id: 'person_a',
-    label: 'Person A',
-    subLabel: '(Kingpin / Mastermind)',
-    type: 'Person',
-    role: 'suspect',
-    riskScore: 96,
-    riskLevel: 'High Risk',
     x: 500,
-    y: 340,
-    details: {
-      entityId: 'PER-A01',
-      age: 38,
-      gender: 'Male',
-      phone: '+91 99880 11223',
-      email: 'a.organizer@crypto-vault.io',
-      remarks: 'Primary orchestrator of layering pipeline. Transferred ₹12,50,000 to Person B and coordinated Person C.',
-      linkedCounts: { 'Phone Numbers': 2, 'Bank Accounts': 2, 'Email Addresses': 1, 'Devices': 2, 'Locations': 2, 'IP Addresses': 1, 'Other Persons': 2 },
-      quickInsight: 'Person A acts as the nexus hub. High inbound criminal proceeds converted into mule transactions to B and coordinated via encrypted calls to C.'
-    }
-  },
-  {
-    id: 'person_b',
-    label: 'Person B',
-    subLabel: '(Mule Account Holder)',
-    type: 'Person',
-    role: 'associate',
-    riskScore: 82,
-    riskLevel: 'High Risk',
-    x: 320,
-    y: 500,
-    details: {
-      entityId: 'PER-B02',
-      age: 27,
-      gender: 'Male',
-      phone: '+91 98450 77889',
-      email: 'b.student@mule.net',
-      remarks: 'Opened bank accounts used for layering transactions from Person A, linked with Person C via shared bank branch and phone calls.',
-      linkedCounts: { 'Phone Numbers': 1, 'Bank Accounts': 2, 'Email Addresses': 0, 'Devices': 1, 'Locations': 1, 'IP Addresses': 1, 'Other Persons': 2 },
-      quickInsight: 'Person B received 14 transactions from Person A totaling ₹8,40,000, immediately disbursing 90% to Person C.'
-    }
-  },
-  {
-    id: 'person_c',
-    label: 'Person C',
-    subLabel: '(Cashout Agent / SIM Runner)',
-    type: 'Person',
-    role: 'associate',
-    riskScore: 79,
-    riskLevel: 'High Risk',
-    x: 680,
-    y: 500,
-    details: {
-      entityId: 'PER-C03',
-      age: 24,
-      gender: 'Male',
-      phone: '+91 91234 44556',
-      email: 'c.runner@protonmail.com',
-      remarks: 'Connected to Person A via CDR calls and shared ATM visits, and to Person B via direct transactions and shared bank.',
-      linkedCounts: { 'Phone Numbers': 1, 'Bank Accounts': 1, 'Email Addresses': 1, 'Devices': 1, 'Locations': 2, 'IP Addresses': 0, 'Other Persons': 2 },
-      quickInsight: 'Person C physically withdrew cash at the ATM moments after receiving alerts from Person B, with telemetry showing co-location.'
-    }
-  },
-  {
-    id: 'bank_shared',
-    label: 'SBI ••4921',
-    subLabel: 'Mule Pool Account',
-    type: 'Bank Account',
-    role: 'normal',
-    riskScore: 91,
-    riskLevel: 'High Risk',
-    x: 270,
-    y: 340,
-    details: {
-      entityId: 'ACC-SB49',
-      bankName: 'State Bank of India',
-      branch: 'Sector 17, Chandigarh',
-      turnover: '₹55,00,000',
-      remarks: 'Common conduit account funded by Person A and accessed by Person B.'
-    }
-  },
-  {
-    id: 'bank_c',
-    label: 'HDFC ••8810',
-    subLabel: 'Cashout Account',
-    type: 'Bank Account',
-    role: 'normal',
-    riskScore: 86,
-    riskLevel: 'High Risk',
-    x: 730,
-    y: 350,
-    details: {
-      entityId: 'ACC-HD88',
-      bankName: 'HDFC Bank',
-      branch: 'Phase 7, Mohali',
-      turnover: '₹34,00,000',
-      remarks: 'Direct cash disbursement point linked to Person C.'
-    }
-  },
-  {
-    id: 'phone_a',
-    label: '+91 99880 11223',
-    subLabel: 'Command Line',
-    type: 'Phone Number',
-    role: 'normal',
-    riskScore: 90,
-    riskLevel: 'High Risk',
-    x: 340,
-    y: 190,
-    details: {
-      entityId: 'PH-A01',
-      carrier: 'Airtel',
-      callsCount: 210,
-      remarks: 'Hub phone initiating calls to both B and C.'
-    }
-  },
-  {
-    id: 'phone_bc',
-    label: '+91 91234 44556',
-    subLabel: 'Field SIM',
-    type: 'Phone Number',
-    role: 'normal',
-    riskScore: 82,
-    riskLevel: 'High Risk',
-    x: 760,
-    y: 200,
-    details: {
-      entityId: 'PH-C03',
-      carrier: 'Vi Mobile',
-      callsCount: 165,
-      remarks: 'Direct communication line between B and C during cashout runs.'
-    }
-  },
-  {
-    id: 'device_shared',
-    label: 'Redmi Note 12',
-    subLabel: 'Shared Device',
-    type: 'Device',
-    role: 'normal',
-    riskScore: 87,
-    riskLevel: 'High Risk',
-    x: 580,
-    y: 180,
-    details: {
-      entityId: 'DEV-R12',
-      model: 'Redmi Note 12 5G',
-      imei: '8690 1204 9912 341',
-      remarks: 'Device used by Person A to access accounts, later handed to Person B.'
-    }
-  },
-  {
-    id: 'atm_hub',
-    label: 'Sector 17 ATM',
-    subLabel: 'Chandigarh',
-    type: 'Location',
-    role: 'normal',
-    riskScore: 94,
-    riskLevel: 'High Risk',
-    x: 480,
-    y: 560,
-    details: {
-      entityId: 'LOC-S17',
-      locationType: 'Bank ATM Hub',
-      atmId: 'ATM-CHD-17',
-      remarks: 'Point where Person C withdrew ₹4,50,000 cash with Person A waiting in getaway vehicle.'
-    }
-  },
-  {
-    id: 'ip_vpn',
-    label: '185.220.101.5',
-    subLabel: 'Tor Exit Node',
-    type: 'IP Address',
-    role: 'normal',
-    riskScore: 98,
-    riskLevel: 'High Risk',
-    x: 480,
-    y: 690,
-    details: {
-      entityId: 'IP-TOR',
-      isp: 'Secure Hosting Ltd',
-      remarks: 'Used by Person A to log into net-banking and authorize RTGS to B.'
-    }
+    y: 660,
+    details: { entityId: 'IP-502', isp: 'ACT Fibernet', remarks: 'Used for midnight net-banking transfers.' }
   }
 ];
 
-const PERSON_ABC_EDGES = [
-  { id: 'ab_e1', source: 'person_a', target: 'bank_shared', type: 'Owns / Uses', label: 'OWNS' },
-  { id: 'ab_e2', source: 'bank_shared', target: 'person_b', type: 'Transactions', label: 'TRANSACTIONS' },
-  { id: 'ab_e3', source: 'person_b', target: 'bank_c', type: 'Transactions', label: 'TRANSACTIONS' },
-  { id: 'ab_e4', source: 'bank_c', target: 'person_c', type: 'Owns / Uses', label: 'OWNS' },
-  { id: 'ab_e5', source: 'person_a', target: 'phone_a', type: 'Calls / Communicates', label: 'CALLS' },
-  { id: 'ab_e6', source: 'phone_a', target: 'person_b', type: 'Calls / Communicates', label: 'CALLS' },
-  { id: 'ab_e7', source: 'person_b', target: 'phone_bc', type: 'Calls / Communicates', label: 'CALLS' },
-  { id: 'ab_e8', source: 'phone_bc', target: 'person_c', type: 'Calls / Communicates', label: 'CALLS' },
-  { id: 'ab_e9', source: 'person_a', target: 'device_shared', type: 'Owns / Uses', label: 'USES' },
-  { id: 'ab_e10', source: 'device_shared', target: 'person_b', type: 'Owns / Uses', label: 'USES' },
-  { id: 'ab_e11', source: 'person_a', target: 'atm_hub', type: 'Located At', label: 'LOCATED AT' },
-  { id: 'ab_e12', source: 'person_c', target: 'atm_hub', type: 'Located At', label: 'LOCATED AT' },
-  { id: 'ab_e13', source: 'atm_hub', target: 'ip_vpn', type: 'Follows / Connected', label: 'CONNECTED' },
-  { id: 'ab_e14', source: 'person_a', target: 'person_c', type: 'Associated With', label: 'ASSOCIATED WITH', style: 'dashed' }
+const DEMO_CONSOLIDATED_EDGES = [
+  { id: 'de1', source: 'DEMO-P1', target: 'DEMO-PH1', type: 'Calls / Communicates', label: 'CALLS' },
+  { id: 'de2', source: 'DEMO-P1', target: 'DEMO-PH2', type: 'Calls / Communicates', label: 'CALLS' },
+  { id: 'de3', source: 'DEMO-P1', target: 'DEMO-DEV1', type: 'Owns / Uses', label: 'USES' },
+  { id: 'de4', source: 'DEMO-P1', target: 'DEMO-B1', type: 'Owns / Uses', label: 'OWNS' },
+  { id: 'de5', source: 'DEMO-P1', target: 'DEMO-B2', type: 'Owns / Uses', label: 'OWNS' },
+  { id: 'de6', source: 'DEMO-P1', target: 'DEMO-LOC1', type: 'Located At', label: 'LOCATED AT' },
+  { id: 'de7', source: 'DEMO-B1', target: 'DEMO-P2', type: 'Transactions', label: 'TRANSACTIONS' },
+  { id: 'de8', source: 'DEMO-P2', target: 'DEMO-PH1', type: 'Calls / Communicates', label: 'CALLS' },
+  { id: 'de9', source: 'DEMO-P2', target: 'DEMO-LOC1', type: 'Located At', label: 'LOCATED AT' },
+  { id: 'de10', source: 'DEMO-B2', target: 'DEMO-P3', type: 'Transactions', label: 'TRANSACTIONS' },
+  { id: 'de11', source: 'DEMO-P3', target: 'DEMO-PH2', type: 'Calls / Communicates', label: 'CALLS' },
+  { id: 'de12', source: 'DEMO-P3', target: 'DEMO-LOC1', type: 'Located At', label: 'LOCATED AT' },
+  { id: 'de13', source: 'DEMO-LOC1', target: 'DEMO-IP1', type: 'Follows / Connected', label: 'CONNECTED' }
 ];
-
-// Color mapping matching the screenshot exactly
-const TYPE_CONFIG = {
-  'Person': {
-    color: '#8B5CF6',
-    glow: 'rgba(139, 92, 246, 0.45)',
-    icon: User,
-    count: 156
-  },
-  'Phone Number': {
-    color: '#3B82F6',
-    glow: 'rgba(59, 130, 246, 0.45)',
-    icon: Phone,
-    count: 320
-  },
-  'Bank Account': {
-    color: '#10B981',
-    glow: 'rgba(16, 185, 129, 0.45)',
-    icon: Building2,
-    count: 248
-  },
-  'Device': {
-    color: '#F97316',
-    glow: 'rgba(249, 115, 22, 0.45)',
-    icon: Smartphone,
-    count: 186
-  },
-  'Email': {
-    color: '#A855F7',
-    glow: 'rgba(168, 85, 247, 0.45)',
-    icon: Mail,
-    count: 197
-  },
-  'Location': {
-    color: '#14B8A6',
-    glow: 'rgba(20, 184, 166, 0.45)',
-    icon: MapPin,
-    count: 85
-  },
-  'IP Address': {
-    color: '#F59E0B',
-    glow: 'rgba(245, 158, 11, 0.45)',
-    icon: Monitor,
-    count: 36
-  },
-  'Organization': {
-    color: '#F43F5E',
-    glow: 'rgba(244, 63, 94, 0.45)',
-    icon: Building,
-    count: 20
-  }
-};
-
-const RELATIONSHIP_CONFIG = {
-  'Calls / Communicates': {
-    color: '#3B82F6',
-    style: 'dashed',
-    dashArray: '5 4',
-    count: 892
-  },
-  'Transactions': {
-    color: '#10B981',
-    style: 'dashed',
-    dashArray: '5 4',
-    count: 684
-  },
-  'Owns / Uses': {
-    color: '#F97316',
-    style: 'dashed',
-    dashArray: '5 4',
-    count: 512
-  },
-  'Associated With': {
-    color: '#A855F7',
-    style: 'dashed',
-    dashArray: '3 3',
-    count: 356
-  },
-  'Located At': {
-    color: '#14B8A6',
-    style: 'dashed',
-    dashArray: '5 4',
-    count: 232
-  },
-  'Follows / Connected': {
-    color: '#F59E0B',
-    style: 'dashed',
-    dashArray: '3 3',
-    count: 180
-  }
-};
 
 export default function IntelligenceGraph() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Active Case metadata
+  // Active Case ID from route or persistent store
   const caseId =
     searchParams.get('caseId') ||
     location.state?.caseId ||
     localStorage.getItem('active_case_id') ||
     'CASE-2025-1024';
 
-  const [activePreset, setActivePreset] = useState('chennai'); // 'chennai' | 'person_abc' | 'pipeline'
-  const [nodes, setNodes] = useState(CHENNAI_NODES);
-  const [edges, setEdges] = useState(CHENNAI_EDGES);
+  // State: Has Entity Resolution been completed for this case?
+  const [hasResolvedEntities, setHasResolvedEntities] = useState(false);
+  const [isDemoFallback, setIsDemoFallback] = useState(false);
 
-  // Selected Entity for Right Sidebar
-  const [selectedNodeId, setSelectedNodeId] = useState('ramesh');
+  // Dynamic Nodes & Edges
+  const [nodes, setNodes] = useState([]);
+  const [edges, setEdges] = useState([]);
+
+  // Selection & Details
+  const [selectedNodeId, setSelectedNodeId] = useState(null);
   const [hoveredNodeId, setHoveredNodeId] = useState(null);
 
-  // Search & Filtering State
+  // Filters & Display Controls
   const [searchQuery, setSearchQuery] = useState('');
   const [showLabels, setShowLabels] = useState(true);
+  const [layoutMode, setLayoutMode] = useState('concentric'); // 'concentric' | 'grid' | 'flow'
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [activeEntityFilters, setActiveEntityFilters] = useState({
     'Person': true,
@@ -671,7 +323,7 @@ export default function IntelligenceGraph() {
     'Follows / Connected': true
   });
 
-  // Canvas Viewport Transforms (Pan & Zoom)
+  // Canvas Navigation (Pan & Zoom)
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
@@ -679,164 +331,329 @@ export default function IntelligenceGraph() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const startPanRef = useRef({ x: 0, y: 0 });
 
-  // Dragging Nodes
+  // Interactive Node Dragging
   const [draggingNodeId, setDraggingNodeId] = useState(null);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
 
-  // Dynamic Collusion Path Tracer Tool Modal/State
-  const [isPathTracerOpen, setIsPathTracerOpen] = useState(false);
-  const [pathStartNode, setPathStartNode] = useState('person_a');
-  const [pathEndNode, setPathEndNode] = useState('person_c');
-  const [activePathNodeIds, setActivePathNodeIds] = useState(new Set());
-  const [activePathEdgeIds, setActivePathEdgeIds] = useState(new Set());
-  const [tracedPathSteps, setTracedPathSteps] = useState([]);
-
-  // Dynamic Entity Addition Modal
+  // Modals
   const [isAddEntityOpen, setIsAddEntityOpen] = useState(false);
+  const [showAllRelModal, setShowAllRelModal] = useState(false);
   const [newEntityForm, setNewEntityForm] = useState({
     label: '',
     subLabel: '',
     type: 'Person',
     role: 'associate',
-    connectTo: 'ramesh',
+    connectTo: '',
     relType: 'Transactions',
     relLabel: 'TRANSACTIONS'
   });
 
-  // Full Relationship View Modal
-  const [showAllRelModal, setShowAllRelModal] = useState(false);
-
-  // Ingest from previous pipeline function if available
+  // ==========================================
+  // DYNAMIC GRAPH SYNTHESIS ENGINE
+  // (Builds strictly from consolidated uploaded data)
+  // ==========================================
   useEffect(() => {
-    const rawPipeline = localStorage.getItem(`output_${caseId}`) || localStorage.getItem('pipelineData');
-    const rawEntities = localStorage.getItem(`entities_${caseId}`);
+    // 1. Fetch resolved entities from Entity Resolution step
+    const rawEntitiesStr = localStorage.getItem(`entities_${caseId}`);
+    // 2. Fetch processed consolidated records from Output step
+    const rawOutputStr =
+      localStorage.getItem(`output_${caseId}`) ||
+      localStorage.getItem(`pipelineData_${caseId}`) ||
+      localStorage.getItem('pipelineData');
 
-    if (activePreset === 'pipeline' && (rawPipeline || rawEntities)) {
+    if (rawEntitiesStr) {
       try {
-        let loadedEntities = [];
-        if (rawEntities) {
-          const parsed = JSON.parse(rawEntities);
-          loadedEntities = parsed.entities || [];
-        }
+        const parsedEntities = JSON.parse(rawEntitiesStr);
+        const resolvedEntities = parsedEntities.entities || [];
 
-        if (loadedEntities.length > 0) {
-          // Construct dynamic graph from real pipeline output!
-          const width = 1000;
-          const height = 700;
-          const centerX = width / 2;
-          const centerY = height / 2;
+        if (resolvedEntities.length > 0) {
+          setHasResolvedEntities(true);
+          setIsDemoFallback(false);
 
-          const pipelineNodes = loadedEntities.map((ent, idx) => {
-            const angle = (idx / loadedEntities.length) * 2 * Math.PI;
-            const radius = idx === 0 ? 0 : 200 + (idx % 3) * 60;
-            const x = centerX + Math.cos(angle) * radius;
-            const y = centerY + Math.sin(angle) * radius;
-
-            let mappedType = 'Person';
-            if (ent.type.includes('Phone')) mappedType = 'Phone Number';
-            else if (ent.type.includes('Bank') || ent.type.includes('UPI')) mappedType = 'Bank Account';
-            else if (ent.type.includes('Device')) mappedType = 'Device';
-            else if (ent.type.includes('Email')) mappedType = 'Email';
-            else if (ent.type.includes('Location')) mappedType = 'Location';
-            else if (ent.type.includes('IP')) mappedType = 'IP Address';
-
-            const isPrimary = idx === 0 || ent.canonical_value.toLowerCase().includes('suspect') || ent.canonical_value.toLowerCase().includes('ramesh');
-
-            return {
-              id: ent.canonical_id || `n_${idx}`,
-              label: ent.canonical_value.slice(0, 18),
-              subLabel: isPrimary ? '(Primary Suspect)' : `(${ent.type})`,
-              type: mappedType,
-              role: isPrimary ? 'suspect' : 'associate',
-              riskScore: isPrimary ? 94 : 65 + (idx * 4) % 25,
-              riskLevel: isPrimary ? 'High Risk' : 'Medium Risk',
-              x: Math.max(120, Math.min(880, x)),
-              y: Math.max(120, Math.min(580, y)),
-              details: {
-                entityId: ent.canonical_id || `E-${idx}`,
-                remarks: `Extracted from case ${caseId} data sources.`,
-                linkedCounts: {
-                  'Phone Numbers': 2,
-                  'Bank Accounts': 1,
-                  'Email Addresses': 1,
-                  'Devices': 1,
-                  'Locations': 1,
-                  'IP Addresses': 1,
-                  'Other Persons': 2
-                },
-                quickInsight: `Central entity discovered during entity resolution of ${caseId}. Linked to multiple records across ingested datasets.`
-              }
-            };
-          });
-
-          // Generate co-occurrence edges
-          const pipelineEdges = [];
-          loadedEntities.forEach((ent, i) => {
-            if (ent.related_canonical_ids && Array.isArray(ent.related_canonical_ids)) {
-              ent.related_canonical_ids.forEach((relId, j) => {
-                if (relId !== ent.canonical_id) {
-                  pipelineEdges.push({
-                    id: `pe_${i}_${j}`,
-                    source: ent.canonical_id,
-                    target: relId,
-                    type: i % 2 === 0 ? 'Transactions' : 'Calls / Communicates',
-                    label: i % 2 === 0 ? 'TRANSACTIONS' : 'CALLS'
-                  });
-                }
-              });
-            }
-          });
-
-          if (pipelineNodes.length > 0) {
-            setNodes(pipelineNodes);
-            if (pipelineEdges.length > 0) setEdges(pipelineEdges);
-            setSelectedNodeId(pipelineNodes[0].id);
+          let parsedRecords = [];
+          if (rawOutputStr) {
+            try {
+              const parsedOut = JSON.parse(rawOutputStr);
+              parsedRecords = parsedOut.records || parsedOut.data || parsedOut.items || [];
+            } catch { parsedRecords = []; }
           }
+
+          // Build dynamic nodes
+          const dynamicNodes = synthesizeNodesFromEntities(resolvedEntities, parsedRecords);
+          // Build dynamic edges from relationships and consolidated records
+          const dynamicEdges = synthesizeEdgesFromRecords(resolvedEntities, parsedRecords, dynamicNodes);
+
+          // Apply layout positioning
+          const positionedNodes = applyLayout(dynamicNodes, dynamicEdges, layoutMode);
+
+          setNodes(positionedNodes);
+          setEdges(dynamicEdges);
+
+          // Select primary suspect or highest-degree node
+          const suspect = positionedNodes.find(n => n.role === 'suspect') || positionedNodes[0];
+          if (suspect) setSelectedNodeId(suspect.id);
+          return;
         }
       } catch (err) {
-        console.error('Error hydrating pipeline graph:', err);
+        console.error('Error synthesizing graph from entity resolution data:', err);
       }
-    } else if (activePreset === 'person_abc') {
-      setNodes(PERSON_ABC_NODES);
-      setEdges(PERSON_ABC_EDGES);
-      setSelectedNodeId('person_a');
-    } else {
-      setNodes(CHENNAI_NODES);
-      setEdges(CHENNAI_EDGES);
-      setSelectedNodeId('ramesh');
     }
-  }, [activePreset, caseId]);
 
-  // Culprit Identification & Graph Metrics Engine
-  const graphMetrics = useMemo(() => {
-    const nodeDegree = {};
-    nodes.forEach(n => { nodeDegree[n.id] = 0; });
-    edges.forEach(e => {
-      if (nodeDegree[e.source] !== undefined) nodeDegree[e.source]++;
-      if (nodeDegree[e.target] !== undefined) nodeDegree[e.target]++;
+    // If no resolved entities exist yet for this case
+    setHasResolvedEntities(false);
+  }, [caseId, layoutMode]);
+
+  // Helper to load demonstration case
+  const loadDemoData = () => {
+    setIsDemoFallback(true);
+    setHasResolvedEntities(true);
+    setNodes(DEMO_CONSOLIDATED_NODES);
+    setEdges(DEMO_CONSOLIDATED_EDGES);
+    setSelectedNodeId('DEMO-P1');
+  };
+
+  // ==========================================
+  // NODE SYNTHESIS ALGORITHM
+  // ==========================================
+  function synthesizeNodesFromEntities(entities, records) {
+    // Calculate entity frequencies from records
+    const entityFrequency = {};
+    records.forEach(r => {
+      Object.values(r).forEach(val => {
+        if (!val) return;
+        const s = String(val).toLowerCase();
+        entityFrequency[s] = (entityFrequency[s] || 0) + 1;
+      });
     });
 
-    // Find highest degree Person as likely culprit
-    let candidateCulprit = null;
-    let maxScore = -1;
-    nodes.filter(n => n.type === 'Person').forEach(p => {
-      const degree = nodeDegree[p.id] || 0;
-      const score = (p.riskScore || 50) + degree * 5;
-      if (score > maxScore) {
-        maxScore = score;
-        candidateCulprit = p;
+    // Find highest frequency/connectivity person to assign primary suspect role
+    let maxPersonFreq = -1;
+    let candidateSuspectId = null;
+
+    entities.forEach(ent => {
+      if (ent.type.toLowerCase().includes('person') || ent.type.toLowerCase() === 'user') {
+        const valKey = String(ent.canonical_value).toLowerCase();
+        const score = (entityFrequency[valKey] || 0) + (ent.linked_records?.length || 0) + (ent.related_canonical_ids?.length || 0) * 2;
+        if (score > maxPersonFreq) {
+          maxPersonFreq = score;
+          candidateSuspectId = ent.canonical_id;
+        }
       }
     });
 
-    return {
-      totalNodes: nodes.length,
-      totalEdges: edges.length,
-      nodeDegree,
-      candidateCulprit
-    };
+    return entities.map((ent, idx) => {
+      // Map entity types into standard display categories
+      let displayType = 'Person';
+      const rawType = (ent.type || '').toLowerCase();
+      if (rawType.includes('phone') || rawType.includes('mobile')) displayType = 'Phone Number';
+      else if (rawType.includes('bank') || rawType.includes('account') || rawType.includes('upi')) displayType = 'Bank Account';
+      else if (rawType.includes('device') || rawType.includes('imei')) displayType = 'Device';
+      else if (rawType.includes('email')) displayType = 'Email';
+      else if (rawType.includes('location') || rawType.includes('atm') || rawType.includes('tower')) displayType = 'Location';
+      else if (rawType.includes('ip')) displayType = 'IP Address';
+      else if (rawType.includes('org') || rawType.includes('company')) displayType = 'Organization';
+
+      const isSuspect = ent.canonical_id === candidateSuspectId || (displayType === 'Person' && idx === 0);
+      const isAssociate = displayType === 'Person' && !isSuspect;
+
+      // Risk score calculation based on record connections and type
+      const recordCount = ent.linked_records?.length || 1;
+      const relatedCount = ent.related_canonical_ids?.length || 0;
+      let calculatedRisk = isSuspect ? 92 : Math.min(95, 55 + recordCount * 4 + relatedCount * 6);
+      if (displayType === 'Bank Account' && recordCount > 5) calculatedRisk = 88;
+
+      const riskLevel = calculatedRisk >= 80 ? 'High Risk' : calculatedRisk >= 60 ? 'Medium Risk' : 'Low Risk';
+
+      return {
+        id: ent.canonical_id,
+        label: ent.canonical_value,
+        subLabel: isSuspect ? '(Suspect)' : isAssociate ? '(Associate)' : displayType === 'Bank Account' ? 'Mule Account' : '',
+        type: displayType,
+        role: isSuspect ? 'suspect' : isAssociate ? 'associate' : 'normal',
+        riskScore: calculatedRisk,
+        riskLevel,
+        x: 500,
+        y: 350,
+        details: {
+          entityId: ent.canonical_id,
+          originalValues: ent.original_values || [ent.canonical_value],
+          linkedRecordsCount: recordCount,
+          remarks: `Extracted from ${recordCount} consolidated record(s) during ingestion & entity resolution.`,
+          linkedCounts: {
+            'Records Linked': recordCount,
+            'Connected Entities': relatedCount
+          },
+          quickInsight: isSuspect
+            ? `${ent.canonical_value} is the primary focal point of this investigation with ${relatedCount} direct connections across the consolidated case files.`
+            : `${ent.canonical_value} colludes within the network, linked to ${relatedCount} entities in case ${caseId}.`
+        }
+      };
+    });
+  }
+
+  // ==========================================
+  // EDGE SYNTHESIS ALGORITHM
+  // ==========================================
+  function synthesizeEdgesFromRecords(entities, records, dynamicNodes) {
+    const edgesList = [];
+    const edgeKeySet = new Set();
+    const nodeValueMap = new Map();
+
+    dynamicNodes.forEach(n => {
+      nodeValueMap.set(String(n.label).toLowerCase(), n.id);
+      if (n.details?.originalValues) {
+        n.details.originalValues.forEach(v => nodeValueMap.set(String(v).toLowerCase(), n.id));
+      }
+    });
+
+    // 1. Trace relationships from processed records (calls, transactions, locations)
+    records.forEach((rec, idx) => {
+      const srcVal = String(rec.source || rec.sender || rec.caller || rec.src_ip || rec.from || '').toLowerCase();
+      const tgtVal = String(rec.target || rec.receiver || rec.called || rec.dest_ip || rec.to || '').toLowerCase();
+
+      const srcId = nodeValueMap.get(srcVal);
+      const tgtId = nodeValueMap.get(tgtVal);
+
+      if (srcId && tgtId && srcId !== tgtId) {
+        const edgeKey = `${srcId}->${tgtId}`;
+        const reverseKey = `${tgtId}->${srcId}`;
+
+        if (!edgeKeySet.has(edgeKey) && !edgeKeySet.has(reverseKey)) {
+          edgeKeySet.add(edgeKey);
+
+          let relType = 'Calls / Communicates';
+          let relLabel = 'CALLS';
+
+          const eventType = String(rec.event_type || rec.type || '').toLowerCase();
+          const amount = rec.amount || rec.txn_amount;
+
+          if (amount || eventType.includes('trans') || eventType.includes('bank') || eventType.includes('upi')) {
+            relType = 'Transactions';
+            relLabel = amount ? `₹${Number(amount).toLocaleString()}` : 'TRANSACTIONS';
+          } else if (eventType.includes('call') || eventType.includes('voice')) {
+            relType = 'Calls / Communicates';
+            relLabel = rec.duration ? `${rec.duration}s` : 'CALLS';
+          } else if (eventType.includes('sms')) {
+            relType = 'Calls / Communicates';
+            relLabel = 'SMS';
+          } else if (eventType.includes('location') || eventType.includes('tower') || eventType.includes('atm')) {
+            relType = 'Located At';
+            relLabel = 'LOCATED AT';
+          }
+
+          edgesList.push({
+            id: `edge_rec_${idx}`,
+            source: srcId,
+            target: tgtId,
+            type: relType,
+            label: relLabel
+          });
+        }
+      }
+    });
+
+    // 2. Ensure all related_canonical_ids from entity resolution have visible edges
+    entities.forEach((ent, i) => {
+      if (ent.related_canonical_ids && Array.isArray(ent.related_canonical_ids)) {
+        ent.related_canonical_ids.forEach((relId, j) => {
+          const edgeKey = `${ent.canonical_id}->${relId}`;
+          const reverseKey = `${relId}->${ent.canonical_id}`;
+
+          if (!edgeKeySet.has(edgeKey) && !edgeKeySet.has(reverseKey)) {
+            edgeKeySet.add(edgeKey);
+            edgesList.push({
+              id: `edge_res_${i}_${j}`,
+              source: ent.canonical_id,
+              target: relId,
+              type: 'Associated With',
+              label: 'ASSOCIATED WITH'
+            });
+          }
+        });
+      }
+    });
+
+    return edgesList;
+  }
+
+  // ==========================================
+  // INTELLIGENT POSITIONING & RESOLUTION ENGINE
+  // ==========================================
+  function applyLayout(nodeList, edgeList, mode) {
+    const total = nodeList.length;
+    if (total === 0) return [];
+
+    const centerX = 500;
+    const centerY = 350;
+
+    if (mode === 'concentric') {
+      // Concentric: Suspect at center, associates in middle ring, accounts/phones in outer ring
+      const suspect = nodeList.find(n => n.role === 'suspect') || nodeList[0];
+      const others = nodeList.filter(n => n.id !== suspect.id);
+
+      const associates = others.filter(n => n.type === 'Person');
+      const infrastructure = others.filter(n => n.type !== 'Person');
+
+      return nodeList.map(node => {
+        if (node.id === suspect.id) {
+          return { ...node, x: centerX, y: centerY };
+        }
+
+        const isAssoc = node.type === 'Person';
+        if (isAssoc) {
+          const aIdx = associates.findIndex(a => a.id === node.id);
+          const angle = (aIdx / Math.max(1, associates.length)) * Math.PI + Math.PI * 0.5;
+          const radius = 190;
+          return {
+            ...node,
+            x: Math.round(centerX + Math.cos(angle) * radius),
+            y: Math.round(centerY + Math.sin(angle) * radius)
+          };
+        } else {
+          const iIdx = infrastructure.findIndex(i => i.id === node.id);
+          const angle = (iIdx / Math.max(1, infrastructure.length)) * 2 * Math.PI;
+          const radius = 260 + (iIdx % 2) * 50;
+          return {
+            ...node,
+            x: Math.round(Math.max(100, Math.min(900, centerX + Math.cos(angle) * radius))),
+            y: Math.round(Math.max(100, Math.min(620, centerY + Math.sin(angle) * radius)))
+          };
+        }
+      });
+    }
+
+    // Default radial circle with collision spreading
+    return nodeList.map((node, idx) => {
+      const angle = (idx / total) * 2 * Math.PI;
+      const radius = 220 + (idx % 3) * 40;
+      return {
+        ...node,
+        x: Math.round(Math.max(100, Math.min(900, centerX + Math.cos(angle) * radius))),
+        y: Math.round(Math.max(100, Math.min(620, centerY + Math.sin(angle) * radius)))
+      };
+    });
+  }
+
+  // ==========================================
+  // REAL-TIME METRICS & FILTERED GRAPH SLICE
+  // ==========================================
+  const graphMetrics = useMemo(() => {
+    const counts = {};
+    Object.keys(TYPE_CONFIG).forEach(t => { counts[t] = 0; });
+    nodes.forEach(n => {
+      if (counts[n.type] !== undefined) counts[n.type]++;
+    });
+
+    const relCounts = {};
+    Object.keys(RELATIONSHIP_CONFIG).forEach(r => { relCounts[r] = 0; });
+    edges.forEach(e => {
+      if (relCounts[e.type] !== undefined) relCounts[e.type]++;
+    });
+
+    return { counts, relCounts, totalNodes: nodes.length, totalEdges: edges.length };
   }, [nodes, edges]);
 
-  // Filtered nodes and edges
+  // Filtered nodes based on active checkboxes and search query
   const visibleNodes = useMemo(() => {
     return nodes.filter(n => {
       if (!activeEntityFilters[n.type]) return false;
@@ -862,12 +679,11 @@ export default function IntelligenceGraph() {
     });
   }, [edges, activeRelFilters, visibleNodeIds]);
 
-  // Selected Node Details
+  // Selected Node and its incident links
   const selectedNode = useMemo(() => {
     return nodes.find(n => n.id === selectedNodeId) || nodes[0] || null;
   }, [nodes, selectedNodeId]);
 
-  // Linked relationships for selected node
   const selectedNodeRelationships = useMemo(() => {
     if (!selectedNode) return [];
     return edges
@@ -884,121 +700,9 @@ export default function IntelligenceGraph() {
       .filter(item => item.connectedNode);
   }, [selectedNode, edges, nodes]);
 
-  // Breadth-First-Search Path Tracing between Person A, B, C...
-  const handleTracePath = (startId, endId) => {
-    if (!startId || !endId || startId === endId) return;
-
-    // Build adjacency graph
-    const adj = {};
-    nodes.forEach(n => { adj[n.id] = []; });
-    edges.forEach(e => {
-      if (adj[e.source] && adj[e.target]) {
-        adj[e.source].push({ target: e.target, edge: e });
-        adj[e.target].push({ target: e.source, edge: e });
-      }
-    });
-
-    // BFS queue: [currentId, pathOfNodes, pathOfEdges]
-    const queue = [[startId, [startId], []]];
-    const visited = new Set([startId]);
-    let foundPath = null;
-
-    while (queue.length > 0) {
-      const [curr, nodePath, edgePath] = queue.shift();
-
-      if (curr === endId) {
-        foundPath = { nodes: nodePath, edges: edgePath };
-        break;
-      }
-
-      for (const neighbor of adj[curr] || []) {
-        if (!visited.has(neighbor.target)) {
-          visited.add(neighbor.target);
-          queue.push([
-            neighbor.target,
-            [...nodePath, neighbor.target],
-            [...edgePath, neighbor.edge]
-          ]);
-        }
-      }
-    }
-
-    if (foundPath) {
-      setActivePathNodeIds(new Set(foundPath.nodes));
-      setActivePathEdgeIds(new Set(foundPath.edges.map(e => e.id)));
-
-      // Build step narrative
-      const steps = [];
-      for (let i = 0; i < foundPath.nodes.length - 1; i++) {
-        const u = nodes.find(n => n.id === foundPath.nodes[i]);
-        const v = nodes.find(n => n.id === foundPath.nodes[i + 1]);
-        const e = foundPath.edges[i];
-        steps.push({
-          from: u?.label || foundPath.nodes[i],
-          to: v?.label || foundPath.nodes[i + 1],
-          type: e?.label || e?.type || 'LINK',
-          desc: `${u?.label} is linked to ${v?.label} via ${e?.label || e?.type}.`
-        });
-      }
-      setTracedPathSteps(steps);
-    } else {
-      setActivePathNodeIds(new Set());
-      setActivePathEdgeIds(new Set());
-      setTracedPathSteps([{ desc: 'No direct or indirect multi-hop path found between selected entities.' }]);
-    }
-  };
-
-  // Add Dynamic Node & Edge
-  const handleAddNewEntity = (e) => {
-    e.preventDefault();
-    if (!newEntityForm.label) return;
-
-    const newId = `node_${Date.now()}`;
-    const x = 500 + (Math.random() - 0.5) * 300;
-    const y = 350 + (Math.random() - 0.5) * 250;
-
-    const newNode = {
-      id: newId,
-      label: newEntityForm.label,
-      subLabel: newEntityForm.subLabel || `(${newEntityForm.role})`,
-      type: newEntityForm.type,
-      role: newEntityForm.role,
-      riskScore: newEntityForm.role === 'suspect' ? 90 : 70,
-      riskLevel: newEntityForm.role === 'suspect' ? 'High Risk' : 'Medium Risk',
-      x,
-      y,
-      details: {
-        entityId: `DYN-${Math.floor(1000 + Math.random() * 9000)}`,
-        remarks: 'Dynamically added during live investigation analysis.',
-        linkedCounts: { 'Phone Numbers': 1, 'Bank Accounts': 1, 'Email Addresses': 0, 'Devices': 1, 'Locations': 1, 'IP Addresses': 0, 'Other Persons': 1 },
-        quickInsight: `Newly mapped connection for ${newEntityForm.label}. Links into existing criminal network via ${newEntityForm.connectTo}.`
-      }
-    };
-
-    const newEdge = {
-      id: `edge_${Date.now()}`,
-      source: newEntityForm.connectTo,
-      target: newId,
-      type: newEntityForm.relType,
-      label: newEntityForm.relLabel
-    };
-
-    setNodes(prev => [...prev, newNode]);
-    setEdges(prev => [...prev, newEdge]);
-    setSelectedNodeId(newId);
-    setIsAddEntityOpen(false);
-    setNewEntityForm({
-      label: '',
-      subLabel: '',
-      type: 'Person',
-      role: 'associate',
-      connectTo: 'ramesh',
-      relType: 'Transactions',
-      relLabel: 'TRANSACTIONS'
-    });
-  };
-
-  // Mouse Interaction Handlers for Pan and Drag
+  // ==========================================
+  // MOUSE & CANVAS CONTROLS (PAN, ZOOM, DRAG)
+  // ==========================================
   const handleMouseDownCanvas = (e) => {
     if (isLocked) return;
     if (e.target.tagName === 'svg' || e.target.id === 'graph-canvas-bg') {
@@ -1017,7 +721,6 @@ export default function IntelligenceGraph() {
       const svg = document.getElementById('knowledge-graph-svg');
       if (svg) {
         const rect = svg.getBoundingClientRect();
-        // Convert screen coordinates to SVG viewBox coordinates
         const scaleX = 1000 / rect.width;
         const scaleY = 700 / rect.height;
         const mouseSvgX = (e.clientX - rect.left) * scaleX / zoom - pan.x / zoom;
@@ -1063,7 +766,7 @@ export default function IntelligenceGraph() {
     }
   };
 
-  // Reset Filters
+  // Reset Filters and View
   const handleResetFilters = () => {
     setActiveEntityFilters({
       'Person': true,
@@ -1084,14 +787,11 @@ export default function IntelligenceGraph() {
       'Follows / Connected': true
     });
     setSearchQuery('');
-    setActivePathNodeIds(new Set());
-    setActivePathEdgeIds(new Set());
-    setTracedPathSteps([]);
     setZoom(1);
     setPan({ x: 0, y: 0 });
   };
 
-  // Export Graph handler
+  // Export handlers
   const handleExport = (format) => {
     if (format === 'json') {
       const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify({ caseId, nodes, edges }, null, 2));
@@ -1102,7 +802,6 @@ export default function IntelligenceGraph() {
       downloadAnchor.click();
       downloadAnchor.remove();
     } else {
-      // SVG download
       const svgEl = document.getElementById('knowledge-graph-svg');
       if (svgEl) {
         const svgData = new XMLSerializer().serializeToString(svgEl);
@@ -1118,8 +817,103 @@ export default function IntelligenceGraph() {
     }
   };
 
+  // Add Dynamic Entity
+  const handleAddNewEntity = (e) => {
+    e.preventDefault();
+    if (!newEntityForm.label) return;
+
+    const newId = `E-MANUAL-${Date.now().toString().slice(-4)}`;
+    const x = 500 + (Math.random() - 0.5) * 260;
+    const y = 350 + (Math.random() - 0.5) * 200;
+
+    const newNode = {
+      id: newId,
+      label: newEntityForm.label,
+      subLabel: newEntityForm.subLabel || `(${newEntityForm.role})`,
+      type: newEntityForm.type,
+      role: newEntityForm.role,
+      riskScore: newEntityForm.role === 'suspect' ? 90 : 70,
+      riskLevel: newEntityForm.role === 'suspect' ? 'High Risk' : 'Medium Risk',
+      x,
+      y,
+      details: {
+        entityId: newId,
+        remarks: 'Manually augmented entity during live forensic analysis.',
+        linkedCounts: { 'Direct Links': 1 },
+        quickInsight: `Added by investigator to track new lead connected to ${newEntityForm.connectTo}.`
+      }
+    };
+
+    const newEdge = {
+      id: `edge_manual_${Date.now()}`,
+      source: newEntityForm.connectTo || nodes[0]?.id,
+      target: newId,
+      type: newEntityForm.relType,
+      label: newEntityForm.relLabel
+    };
+
+    setNodes(prev => [...prev, newNode]);
+    setEdges(prev => [...prev, newEdge]);
+    setSelectedNodeId(newId);
+    setIsAddEntityOpen(false);
+  };
+
   const nodeMap = useMemo(() => new Map(nodes.map(n => [n.id, n])), [nodes]);
 
+  // ==========================================
+  // GATEKEEPER VIEW: IF ENTITY RESOLUTION NOT RUN
+  // ==========================================
+  if (!hasResolvedEntities) {
+    return (
+      <div className="flex h-screen w-screen bg-[#070B19] text-white flex-col items-center justify-center p-6 select-none">
+        <div className="max-w-md w-full bg-[#0D1533] border border-[#1E2B58] rounded-2xl p-8 text-center shadow-2xl space-y-5">
+          <div className="w-16 h-16 rounded-2xl bg-purple-950/80 border border-purple-700/60 text-purple-400 flex items-center justify-center mx-auto shadow-lg shadow-purple-900/40">
+            <Network className="w-8 h-8" />
+          </div>
+
+          <div>
+            <h2 className="text-xl font-bold tracking-tight text-white">
+              Entity Resolution Required
+            </h2>
+            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+              The Intelligence Graph synthesizes directly from the unified and deduplicated entities produced in the <strong>Entity Resolution</strong> step.
+            </p>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-[#090F24] border border-[#17203E] text-left text-xs space-y-2">
+            <div className="flex items-center justify-between text-[11px] text-slate-400">
+              <span>Target Case ID:</span>
+              <span className="font-mono text-purple-300 font-bold">{caseId}</span>
+            </div>
+            <div className="text-[11px] text-slate-400 leading-normal">
+              Run Entity Resolution for this case to generate canonical identities, phone links, and bank co-occurrences.
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2.5 pt-2">
+            <button
+              onClick={() => navigate(`/entities?caseId=${caseId}`)}
+              className="w-full py-2.5 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-purple-900/30 flex items-center justify-center space-x-2 transition"
+            >
+              <span>Proceed to Entity Resolution</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+
+            <button
+              onClick={loadDemoData}
+              className="w-full py-2 px-4 bg-[#121A38] hover:bg-[#18234B] border border-[#202E5C] text-slate-300 hover:text-white text-xs font-semibold rounded-xl transition"
+            >
+              Load Sample Consolidated Case (Chennai ATM Fraud)
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ==========================================
+  // FULL KNOWLEDGE GRAPH EXPLORER WORKSPACE
+  // ==========================================
   return (
     <div
       className={`flex h-screen w-screen overflow-hidden font-sans select-none ${
@@ -1129,7 +923,7 @@ export default function IntelligenceGraph() {
       onMouseUp={handleMouseUp}
     >
       {/* ==========================================
-          LEFT SIDEBAR: OVERVIEW & FILTERS
+          LEFT SIDEBAR: DYNAMIC OVERVIEW & FILTERS
           ========================================== */}
       <aside className="w-64 shrink-0 flex flex-col border-r border-[#151D3B] bg-[#090F24] z-20">
         {/* Brand Header */}
@@ -1138,91 +932,61 @@ export default function IntelligenceGraph() {
             <Network className="h-5 w-5 text-white" />
           </div>
           <div>
-            <div className="text-sm font-bold tracking-tight text-white flex items-center gap-1">
-              MuleGuard AI
-            </div>
+            <div className="text-sm font-bold tracking-tight text-white">MuleGuard AI</div>
             <div className="text-[11px] text-slate-400 font-medium">Knowledge Graph Explorer</div>
           </div>
         </div>
 
         {/* Scrollable Filters Content */}
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5 custom-scrollbar text-xs">
-          {/* Preset Switcher */}
-          <div className="bg-[#0D1533] border border-[#1C264D] rounded-lg p-2.5 space-y-2">
+          {/* Data Source Indicator */}
+          <div className="bg-[#0D1533] border border-[#1C264D] rounded-lg p-2.5 space-y-1">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-              Case Dataset / Mode
+              Consolidated Case
             </span>
-            <div className="grid grid-cols-1 gap-1.5">
-              <button
-                onClick={() => setActivePreset('chennai')}
-                className={`w-full text-left px-2.5 py-1.5 rounded text-[11px] font-semibold transition flex items-center justify-between ${
-                  activePreset === 'chennai'
-                    ? 'bg-purple-600/30 text-purple-300 border border-purple-500/50'
-                    : 'text-slate-400 hover:bg-[#152044] hover:text-slate-200'
-                }`}
-              >
-                <span>ATM Fraud Syndicate</span>
-                {activePreset === 'chennai' && <Check className="w-3 h-3 text-purple-400" />}
-              </button>
-              <button
-                onClick={() => setActivePreset('person_abc')}
-                className={`w-full text-left px-2.5 py-1.5 rounded text-[11px] font-semibold transition flex items-center justify-between ${
-                  activePreset === 'person_abc'
-                    ? 'bg-blue-600/30 text-blue-300 border border-blue-500/50'
-                    : 'text-slate-400 hover:bg-[#152044] hover:text-slate-200'
-                }`}
-              >
-                <span>Person A, B, C Collusion</span>
-                {activePreset === 'person_abc' && <Check className="w-3 h-3 text-blue-400" />}
-              </button>
-              <button
-                onClick={() => setActivePreset('pipeline')}
-                className={`w-full text-left px-2.5 py-1.5 rounded text-[11px] font-semibold transition flex items-center justify-between ${
-                  activePreset === 'pipeline'
-                    ? 'bg-emerald-600/30 text-emerald-300 border border-emerald-500/50'
-                    : 'text-slate-400 hover:bg-[#152044] hover:text-slate-200'
-                }`}
-              >
-                <span>Live Pipeline Data</span>
-                {activePreset === 'pipeline' && <Check className="w-3 h-3 text-emerald-400" />}
-              </button>
+            <div className="flex items-center justify-between text-xs text-slate-200">
+              <span className="font-mono font-bold text-purple-300">{caseId}</span>
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">
+                {isDemoFallback ? 'DEMO' : 'LIVE'}
+              </span>
             </div>
+            <p className="text-[10px] text-slate-400">
+              {isDemoFallback
+                ? 'Synthesized from ATM fraud investigation records.'
+                : 'Synthesized directly from uploaded case records & resolved entities.'}
+            </p>
           </div>
 
-          {/* GRAPH OVERVIEW */}
+          {/* GRAPH OVERVIEW (DYNAMIC COUNTS) */}
           <div>
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
               Graph Overview
             </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between bg-[#0D1533] px-3 py-2 rounded-lg border border-[#17203E]">
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between bg-[#0D1533] px-3 py-1.5 rounded-lg border border-[#17203E]">
                 <span className="flex items-center gap-2 text-slate-300 text-[11px]">
                   <User className="w-3.5 h-3.5 text-purple-400" /> Total Nodes
                 </span>
-                <span className="font-bold text-white text-xs">{graphMetrics.totalNodes.toLocaleString()}</span>
+                <span className="font-bold text-white text-xs">{graphMetrics.totalNodes}</span>
               </div>
-              <div className="flex items-center justify-between bg-[#0D1533] px-3 py-2 rounded-lg border border-[#17203E]">
+              <div className="flex items-center justify-between bg-[#0D1533] px-3 py-1.5 rounded-lg border border-[#17203E]">
                 <span className="flex items-center gap-2 text-slate-300 text-[11px]">
                   <Building2 className="w-3.5 h-3.5 text-emerald-400" /> Total Relationships
                 </span>
-                <span className="font-bold text-white text-xs">{graphMetrics.totalEdges.toLocaleString()}</span>
+                <span className="font-bold text-white text-xs">{graphMetrics.totalEdges}</span>
               </div>
-              <div className="flex items-center justify-between bg-[#0D1533] px-3 py-2 rounded-lg border border-[#17203E]">
+              <div className="flex items-center justify-between bg-[#0D1533] px-3 py-1.5 rounded-lg border border-[#17203E]">
                 <span className="flex items-center gap-2 text-slate-300 text-[11px]">
                   <Layers className="w-3.5 h-3.5 text-amber-400" /> Entity Types
                 </span>
-                <span className="font-bold text-white text-xs">8</span>
-              </div>
-              <div className="flex items-center justify-between bg-[#0D1533] px-3 py-2 rounded-lg border border-[#17203E]">
-                <span className="flex items-center gap-2 text-slate-300 text-[11px]">
-                  <Network className="w-3.5 h-3.5 text-blue-400" /> Communities
+                <span className="font-bold text-white text-xs">
+                  {Object.values(graphMetrics.counts).filter(c => c > 0).length}
                 </span>
-                <span className="font-bold text-white text-xs">6</span>
               </div>
             </div>
           </div>
 
-          {/* ENTITY TYPES */}
+          {/* ENTITY TYPES (FUNCTIONAL TOGGLES) */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
@@ -1245,6 +1009,7 @@ export default function IntelligenceGraph() {
               {Object.entries(TYPE_CONFIG).map(([type, cfg]) => {
                 const IconComp = cfg.icon;
                 const isChecked = !!activeEntityFilters[type];
+                const count = graphMetrics.counts[type] || 0;
                 return (
                   <label
                     key={type}
@@ -1255,7 +1020,7 @@ export default function IntelligenceGraph() {
                       <span className="text-slate-200 group-hover:text-white transition">{type}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-slate-400 font-mono text-[10px]">{cfg.count}</span>
+                      <span className="text-slate-400 font-mono text-[10px]">{count}</span>
                       <input
                         type="checkbox"
                         checked={isChecked}
@@ -1271,7 +1036,7 @@ export default function IntelligenceGraph() {
             </div>
           </div>
 
-          {/* RELATIONSHIP TYPES */}
+          {/* RELATIONSHIP TYPES (FUNCTIONAL TOGGLES) */}
           <div>
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
               Relationship Types
@@ -1279,6 +1044,7 @@ export default function IntelligenceGraph() {
             <div className="space-y-1">
               {Object.entries(RELATIONSHIP_CONFIG).map(([rel, cfg]) => {
                 const isChecked = !!activeRelFilters[rel];
+                const count = graphMetrics.relCounts[rel] || 0;
                 return (
                   <label
                     key={rel}
@@ -1290,14 +1056,14 @@ export default function IntelligenceGraph() {
                           className="w-3 h-0.5"
                           style={{
                             backgroundColor: cfg.color,
-                            borderStyle: cfg.style === 'dashed' ? 'dashed' : 'solid'
+                            borderStyle: cfg.dashArray ? 'dashed' : 'solid'
                           }}
                         />
                       </div>
                       <span className="text-slate-200 group-hover:text-white transition">{rel}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-slate-400 font-mono text-[10px]">{cfg.count}</span>
+                      <span className="text-slate-400 font-mono text-[10px]">{count}</span>
                       <input
                         type="checkbox"
                         checked={isChecked}
@@ -1321,24 +1087,24 @@ export default function IntelligenceGraph() {
             className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-[#202B52] bg-[#0E1636] hover:bg-[#15204C] text-slate-300 hover:text-white text-xs font-semibold transition"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reset Filters</span>
+            <span>Reset Filters & Layout</span>
           </button>
         </div>
       </aside>
 
       {/* ==========================================
-          CENTER AREA: TOP BAR + MAIN GRAPH CANVAS
+          MAIN WORKSPACE: HEADER + GRAPH CANVAS
           ========================================== */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-        {/* Top Header Bar */}
+        {/* Top Header */}
         <header className="h-14 shrink-0 flex items-center justify-between px-5 border-b border-[#151D3B] bg-[#080D20] z-10">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate('/cases')}
+              onClick={() => navigate(`/entities?caseId=${caseId}`)}
               className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition font-medium"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Back to Case</span>
+              <span>Back to Entities</span>
             </button>
 
             <div className="h-4 w-px bg-[#1F294D]" />
@@ -1346,38 +1112,43 @@ export default function IntelligenceGraph() {
             <div className="flex items-center gap-2">
               <span className="text-sm font-bold text-white tracking-wide">{caseId}</span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-900/60 text-red-300 border border-red-700/60">
-                High Risk
+                Active Inquiry
               </span>
             </div>
 
             <span className="text-xs text-slate-400 hidden lg:inline">
-              ATM Fraud Case – Chennai
+              Consolidated Intelligence Network
             </span>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Date Range Filter */}
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[#1F2A52] bg-[#0D1533] text-xs text-slate-300">
-              <Calendar className="w-3.5 h-3.5 text-slate-400" />
-              <span>20 May 2025 – 27 May 2025</span>
+            {/* Layout Switcher */}
+            <div className="flex items-center bg-[#0D1533] border border-[#1F2A52] rounded-lg p-0.5 text-xs">
+              <button
+                onClick={() => setLayoutMode('concentric')}
+                className={`px-2.5 py-1 rounded text-[11px] font-semibold transition ${
+                  layoutMode === 'concentric' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Concentric
+              </button>
+              <button
+                onClick={() => setLayoutMode('grid')}
+                className={`px-2.5 py-1 rounded text-[11px] font-semibold transition ${
+                  layoutMode === 'grid' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Radial Orbit
+              </button>
             </div>
 
-            {/* Path Tracer / Culprit Finder Button */}
-            <button
-              onClick={() => setIsPathTracerOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-700 to-indigo-600 hover:from-purple-600 hover:to-indigo-500 text-white text-xs font-semibold shadow-md shadow-purple-900/30 transition"
-            >
-              <GitBranch className="w-3.5 h-3.5" />
-              <span>Trace Person A-B-C Paths</span>
-            </button>
-
-            {/* Add Dynamic Entity Button */}
+            {/* Add Dynamic Lead / Entity */}
             <button
               onClick={() => setIsAddEntityOpen(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#1F2A52] bg-[#0D1533] hover:bg-[#14204A] text-slate-200 text-xs font-semibold transition"
             >
               <Plus className="w-3.5 h-3.5 text-purple-400" />
-              <span>Add Entity / Link</span>
+              <span>Add Lead / Entity</span>
             </button>
 
             {/* Export Graph Dropdown */}
@@ -1397,26 +1168,26 @@ export default function IntelligenceGraph() {
                   onClick={() => handleExport('json')}
                   className="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-[#1B2754] hover:text-white rounded flex items-center gap-2"
                 >
-                  <Share2 className="w-3 h-3 text-blue-400" /> Export Data (JSON)
+                  <Share2 className="w-3 h-3 text-blue-400" /> Export JSON Network
                 </button>
               </div>
             </div>
           </div>
         </header>
 
-        {/* Sub-Header / Canvas Controls */}
+        {/* Sub-Header / Search & Quick Actions */}
         <div className="h-12 shrink-0 flex items-center justify-between px-6 border-b border-[#121933] bg-[#070B1B]/80 backdrop-blur-sm z-10">
           <div>
             <h2 className="text-sm font-bold text-white flex items-center gap-2">
               <span>Neo4j Knowledge Graph</span>
               <span className="text-[11px] font-normal text-slate-400">
-                Visualize and explore relationships between entities.
+                Interactive relationship mapping derived from consolidated records.
               </span>
             </h2>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Search Entity Input */}
+            {/* Real Search Entity Input */}
             <div className="relative w-72">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
               <input
@@ -1436,7 +1207,7 @@ export default function IntelligenceGraph() {
               )}
             </div>
 
-            {/* Canvas Quick Actions */}
+            {/* Controls */}
             <div className="flex items-center gap-1 border-l border-[#1C264D] pl-3">
               <button
                 onClick={() => setIsDarkMode(!isDarkMode)}
@@ -1460,42 +1231,12 @@ export default function IntelligenceGraph() {
               >
                 {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
               </button>
-              <button
-                onClick={() => handleResetFilters()}
-                title="Reset View"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#141E44] transition"
-              >
-                <Settings className="w-3.5 h-3.5" />
-              </button>
             </div>
           </div>
         </div>
 
-        {/* Path Active Alert Bar (if active path tracing is on) */}
-        {activePathNodeIds.size > 0 && (
-          <div className="bg-purple-950/80 border-b border-purple-800/60 px-6 py-2 flex items-center justify-between text-xs z-10 backdrop-blur-sm">
-            <div className="flex items-center gap-2 text-purple-200">
-              <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
-              <span className="font-bold">Collusion Path Active:</span>
-              <span>
-                Illuminating {activePathNodeIds.size} connected entities and {activePathEdgeIds.size} links involved in crime chain.
-              </span>
-            </div>
-            <button
-              onClick={() => {
-                setActivePathNodeIds(new Set());
-                setActivePathEdgeIds(new Set());
-                setTracedPathSteps([]);
-              }}
-              className="text-[11px] font-semibold text-purple-300 hover:text-white bg-purple-900/60 px-2 py-0.5 rounded border border-purple-700/50"
-            >
-              Clear Trace
-            </button>
-          </div>
-        )}
-
         {/* ==========================================
-            MAIN INTERACTIVE GRAPH CANVAS
+            MAIN GRAPH SVG CANVAS (HIGH RESOLUTION)
             ========================================== */}
         <div
           id="graph-canvas-bg"
@@ -1516,34 +1257,25 @@ export default function IntelligenceGraph() {
               transition: isPanning || draggingNodeId ? 'none' : 'transform 0.15s ease-out'
             }}
           >
-            {/* SVG Filter Glows and Arrow Markers */}
+            {/* Filters and Marker Arrows */}
             <defs>
               <filter id="glow-red" x="-50%" y="-50%" width="200%" height="200%">
-                <feDropShadow dx="0" dy="0" stdDeviation="8" floodColor="#EF4444" floodOpacity="0.7" />
+                <feDropShadow dx="0" dy="0" stdDeviation="8" floodColor="#EF4444" floodOpacity="0.75" />
               </filter>
               <filter id="glow-purple" x="-50%" y="-50%" width="200%" height="200%">
-                <feDropShadow dx="0" dy="0" stdDeviation="6" floodColor="#8B5CF6" floodOpacity="0.6" />
+                <feDropShadow dx="0" dy="0" stdDeviation="6" floodColor="#8B5CF6" floodOpacity="0.65" />
               </filter>
-              <filter id="glow-blue" x="-50%" y="-50%" width="200%" height="200%">
-                <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#3B82F6" floodOpacity="0.6" />
-              </filter>
-              <filter id="glow-green" x="-50%" y="-50%" width="200%" height="200%">
-                <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#10B981" floodOpacity="0.6" />
-              </filter>
-              <filter id="glow-orange" x="-50%" y="-50%" width="200%" height="200%">
-                <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#F97316" floodOpacity="0.6" />
-              </filter>
-              <filter id="glow-teal" x="-50%" y="-50%" width="200%" height="200%">
-                <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#14B8A6" floodOpacity="0.6" />
-              </filter>
+              <radialGradient id="grad-red" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="#EF4444" />
+                <stop offset="100%" stopColor="#991B1B" />
+              </radialGradient>
 
-              {/* Arrow Markers for each relationship color */}
               {Object.entries(RELATIONSHIP_CONFIG).map(([name, cfg]) => (
                 <marker
                   key={`arrow-${name}`}
                   id={`arrow-${name.replace(/\s+/g, '-').toLowerCase()}`}
                   viewBox="0 0 10 10"
-                  refX="24"
+                  refX="26"
                   refY="5"
                   markerWidth="6"
                   markerHeight="6"
@@ -1554,55 +1286,35 @@ export default function IntelligenceGraph() {
               ))}
             </defs>
 
-            {/* EDGES (RELATIONSHIPS) */}
+            {/* EDGES LAYER */}
             <g id="edges-layer">
               {visibleEdges.map(edge => {
                 const src = nodeMap.get(edge.source);
                 const tgt = nodeMap.get(edge.target);
                 if (!src || !tgt) return null;
 
-                const relCfg = RELATIONSHIP_CONFIG[edge.type] || {
-                  color: '#94A3B8',
-                  style: 'solid',
-                  dashArray: 'none'
-                };
-                const isPathActive = activePathEdgeIds.has(edge.id);
-                const isDimmed = activePathEdgeIds.size > 0 && !isPathActive;
+                const relCfg = RELATIONSHIP_CONFIG[edge.type] || { color: '#94A3B8', dashArray: 'none' };
                 const isSelectedEdge =
                   selectedNodeId && (edge.source === selectedNodeId || edge.target === selectedNodeId);
 
-                // Midpoint for label
                 const midX = (src.x + tgt.x) / 2;
                 const midY = (src.y + tgt.y) / 2;
                 const markerId = `arrow-${edge.type.replace(/\s+/g, '-').toLowerCase()}`;
 
                 return (
-                  <g key={edge.id} opacity={isDimmed ? 0.15 : isSelectedEdge ? 1 : 0.85}>
-                    {/* Background wider hit target */}
+                  <g key={edge.id} opacity={isSelectedEdge ? 1 : 0.8}>
                     <line
                       x1={src.x}
                       y1={src.y}
                       x2={tgt.x}
                       y2={tgt.y}
-                      stroke="transparent"
-                      strokeWidth="12"
-                      className="cursor-pointer"
-                    />
-
-                    {/* Edge Main Line */}
-                    <line
-                      x1={src.x}
-                      y1={src.y}
-                      x2={tgt.x}
-                      y2={tgt.y}
-                      stroke={isPathActive ? '#FBBF24' : isSelectedEdge ? '#FFFFFF' : relCfg.color}
-                      strokeWidth={isPathActive ? 2.8 : isSelectedEdge ? 2 : 1.5}
+                      stroke={isSelectedEdge ? '#FFFFFF' : relCfg.color}
+                      strokeWidth={isSelectedEdge ? 2.2 : 1.5}
                       strokeDasharray={relCfg.dashArray}
                       markerEnd={`url(#${markerId})`}
-                      className={isPathActive ? 'animate-pulse' : ''}
                     />
 
-                    {/* Edge Text Label Badge */}
+                    {/* Edge Label Badge */}
                     {showLabels && edge.label && (
                       <g transform={`translate(${midX}, ${midY})`}>
                         <rect
@@ -1612,7 +1324,7 @@ export default function IntelligenceGraph() {
                           height="16"
                           rx="4"
                           fill="#080D21"
-                          stroke={isPathActive ? '#FBBF24' : isSelectedEdge ? '#FFFFFF' : relCfg.color}
+                          stroke={isSelectedEdge ? '#FFFFFF' : relCfg.color}
                           strokeWidth="0.8"
                           opacity="0.95"
                         />
@@ -1623,7 +1335,7 @@ export default function IntelligenceGraph() {
                           fontSize="8"
                           fontWeight="bold"
                           letterSpacing="0.5"
-                          fill={isPathActive ? '#FBBF24' : isSelectedEdge ? '#FFFFFF' : relCfg.color}
+                          fill={isSelectedEdge ? '#FFFFFF' : relCfg.color}
                         >
                           {edge.label}
                         </text>
@@ -1634,45 +1346,31 @@ export default function IntelligenceGraph() {
               })}
             </g>
 
-            {/* NODES */}
+            {/* NODES LAYER */}
             <g id="nodes-layer">
               {visibleNodes.map(node => {
-                const typeCfg = TYPE_CONFIG[node.type] || {
-                  color: '#94A3B8',
-                  glow: 'rgba(148, 163, 184, 0.4)',
-                  icon: User
-                };
+                const typeCfg = TYPE_CONFIG[node.type] || { color: '#94A3B8', icon: User };
                 const isSelected = selectedNodeId === node.id;
-                const isHovered = hoveredNodeId === node.id;
                 const isCulprit = node.role === 'suspect';
-                const isPathActive = activePathNodeIds.has(node.id);
-                const isDimmed = activePathNodeIds.size > 0 && !isPathActive;
                 const IconComponent = typeCfg.icon;
-
                 const nodeRadius = isCulprit ? 26 : 22;
-                const filterGlow = isCulprit
-                  ? 'url(#glow-red)'
-                  : isSelected
-                  ? 'url(#glow-purple)'
-                  : undefined;
 
                 return (
                   <g
                     key={node.id}
                     transform={`translate(${node.x}, ${node.y})`}
                     className="cursor-pointer transition-transform"
-                    opacity={isDimmed ? 0.2 : 1}
                     onMouseDown={e => handleStartNodeDrag(e, node.id, node.x, node.y)}
                     onMouseEnter={() => setHoveredNodeId(node.id)}
                     onMouseLeave={() => setHoveredNodeId(null)}
                     onClick={() => setSelectedNodeId(node.id)}
                   >
-                    {/* Pulsing Aura for Primary Suspect / Path Active */}
-                    {(isCulprit || isPathActive) && (
+                    {/* Pulsing Aura for Primary Suspect */}
+                    {isCulprit && (
                       <circle
-                        r={nodeRadius + 10}
+                        r={nodeRadius + 12}
                         fill="none"
-                        stroke={isCulprit ? '#EF4444' : '#FBBF24'}
+                        stroke="#EF4444"
                         strokeWidth="1.5"
                         opacity="0.4"
                         className="animate-ping"
@@ -1684,31 +1382,17 @@ export default function IntelligenceGraph() {
                       r={nodeRadius + 4}
                       fill="none"
                       stroke={isCulprit ? '#EF4444' : isSelected ? '#FFFFFF' : typeCfg.color}
-                      strokeWidth={isSelected || isHovered ? 2.5 : 1.5}
-                      filter={filterGlow}
+                      strokeWidth={isSelected ? 2.5 : 1.5}
+                      filter={isCulprit ? 'url(#glow-red)' : isSelected ? 'url(#glow-purple)' : undefined}
                     />
 
                     {/* Central Node Body Circle */}
                     <circle
                       r={nodeRadius}
-                      fill={
-                        isCulprit
-                          ? 'url(#grad-red)'
-                          : isSelected
-                          ? '#1E1B4B'
-                          : '#0B112B'
-                      }
+                      fill={isCulprit ? 'url(#grad-red)' : isSelected ? '#1E1B4B' : '#0B112B'}
                       stroke={isCulprit ? '#DC2626' : typeCfg.color}
                       strokeWidth="2"
                     />
-
-                    {/* Radial Gradients */}
-                    <defs>
-                      <radialGradient id="grad-red" cx="50%" cy="50%" r="50%">
-                        <stop offset="0%" stopColor="#EF4444" />
-                        <stop offset="100%" stopColor="#991B1B" />
-                      </radialGradient>
-                    </defs>
 
                     {/* Node Icon */}
                     <foreignObject
@@ -1721,17 +1405,14 @@ export default function IntelligenceGraph() {
                       <div className="w-full h-full flex items-center justify-center">
                         <IconComponent
                           className="w-4 h-4"
-                          style={{
-                            color: isCulprit ? '#FFFFFF' : typeCfg.color
-                          }}
+                          style={{ color: isCulprit ? '#FFFFFF' : typeCfg.color }}
                         />
                       </div>
                     </foreignObject>
 
-                    {/* Node Label Text */}
+                    {/* High-Resolution Node Labels */}
                     {showLabels && (
                       <g transform={`translate(0, ${nodeRadius + 14})`}>
-                        {/* Primary Label */}
                         <text
                           textAnchor="middle"
                           fontSize="11"
@@ -1741,8 +1422,6 @@ export default function IntelligenceGraph() {
                         >
                           {node.label}
                         </text>
-
-                        {/* Secondary / Subtitle Label */}
                         {node.subLabel && (
                           <text
                             y="13"
@@ -1768,7 +1447,7 @@ export default function IntelligenceGraph() {
             </g>
           </svg>
 
-          {/* Floating Zoom & Pan Controls (Bottom-Left) */}
+          {/* Floating Canvas Controls (Bottom-Left) */}
           <div className="absolute bottom-6 left-6 flex flex-col gap-1.5 bg-[#090F24]/90 backdrop-blur-md p-1.5 rounded-xl border border-[#1C264D] shadow-xl z-10">
             <button
               onClick={() => setZoom(prev => Math.min(prev + 0.2, 2.5))}
@@ -1806,7 +1485,7 @@ export default function IntelligenceGraph() {
             </button>
           </div>
 
-          {/* Bottom Center Legend */}
+          {/* Legend (Bottom-Center) */}
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-[#090F24]/90 backdrop-blur-md px-4 py-2 rounded-full border border-[#1C264D] shadow-xl flex items-center gap-4 text-[11px] text-slate-300 z-10 hidden md:flex">
             {Object.entries(TYPE_CONFIG).map(([type, cfg]) => (
               <div key={type} className="flex items-center gap-1.5">
@@ -1816,7 +1495,7 @@ export default function IntelligenceGraph() {
             ))}
           </div>
 
-          {/* Bottom Right Mini-Map Navigator */}
+          {/* Live Mini-Map (Bottom-Right) */}
           <div className="absolute bottom-6 right-6 w-36 h-28 bg-[#090F24]/90 backdrop-blur-md rounded-xl border border-[#1C264D] shadow-2xl p-2 hidden lg:flex flex-col z-10">
             <div className="flex justify-between items-center text-[9px] text-slate-400 font-semibold mb-1">
               <span>MINI MAP</span>
@@ -1828,17 +1507,7 @@ export default function IntelligenceGraph() {
                   const s = nodeMap.get(e.source);
                   const t = nodeMap.get(e.target);
                   if (!s || !t) return null;
-                  return (
-                    <line
-                      key={e.id}
-                      x1={s.x}
-                      y1={s.y}
-                      x2={t.x}
-                      y2={t.y}
-                      stroke="#475569"
-                      strokeWidth="3"
-                    />
-                  );
+                  return <line key={e.id} x1={s.x} y1={s.y} x2={t.x} y2={t.y} stroke="#475569" strokeWidth="3" />;
                 })}
                 {visibleNodes.map(n => (
                   <circle
@@ -1850,27 +1519,16 @@ export default function IntelligenceGraph() {
                   />
                 ))}
               </svg>
-              {/* Viewport Box */}
-              <div
-                className="absolute border border-purple-500 bg-purple-500/10 pointer-events-none rounded"
-                style={{
-                  left: '20%',
-                  top: '15%',
-                  width: `${Math.max(20, 60 / zoom)}%`,
-                  height: `${Math.max(20, 60 / zoom)}%`
-                }}
-              />
             </div>
           </div>
         </div>
       </main>
 
       {/* ==========================================
-          RIGHT SIDEBAR: ENTITY DETAILS & CULPRIT INTEL
+          RIGHT SIDEBAR: ENTITY DETAILS & AI SYNOPSIS
           ========================================== */}
       {selectedNode && (
         <aside className="w-80 shrink-0 flex flex-col border-l border-[#151D3B] bg-[#090F24] z-20">
-          {/* Header */}
           <div className="flex items-center justify-between px-4 py-3.5 border-b border-[#151D3B]">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
               Entity Details
@@ -1883,9 +1541,8 @@ export default function IntelligenceGraph() {
             </button>
           </div>
 
-          {/* Body Content */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar text-xs">
-            {/* Entity Header Profile */}
+            {/* Profile Avatar */}
             <div className="flex items-center gap-3">
               <div
                 className={`w-12 h-12 rounded-full flex items-center justify-center border-2 shadow-lg ${
@@ -1894,9 +1551,7 @@ export default function IntelligenceGraph() {
                     : 'bg-purple-950/80 border-purple-500 text-purple-400 shadow-purple-900/40'
                 }`}
               >
-                {React.createElement(TYPE_CONFIG[selectedNode.type]?.icon || User, {
-                  className: 'w-6 h-6'
-                })}
+                {React.createElement(TYPE_CONFIG[selectedNode.type]?.icon || User, { className: 'w-6 h-6' })}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
@@ -1917,40 +1572,12 @@ export default function IntelligenceGraph() {
               </div>
             </div>
 
-            {/* Attributes Key-Value Table */}
+            {/* Key-Value Attributes */}
             <div className="bg-[#0D1533] rounded-lg border border-[#17203E] divide-y divide-[#17203E]">
               <div className="flex justify-between px-3 py-2 text-[11px]">
-                <span className="text-slate-400">Entity ID</span>
-                <span className="font-mono text-white font-semibold">
-                  {selectedNode.details?.entityId || 'ENT-001'}
-                </span>
+                <span className="text-slate-400">Canonical ID</span>
+                <span className="font-mono text-white font-semibold">{selectedNode.details?.entityId}</span>
               </div>
-              {selectedNode.details?.age && (
-                <div className="flex justify-between px-3 py-2 text-[11px]">
-                  <span className="text-slate-400">Age</span>
-                  <span className="text-white font-semibold">{selectedNode.details.age}</span>
-                </div>
-              )}
-              {selectedNode.details?.gender && (
-                <div className="flex justify-between px-3 py-2 text-[11px]">
-                  <span className="text-slate-400">Gender</span>
-                  <span className="text-white font-semibold">{selectedNode.details.gender}</span>
-                </div>
-              )}
-              {selectedNode.details?.phone && (
-                <div className="flex justify-between px-3 py-2 text-[11px]">
-                  <span className="text-slate-400">Phone (Primary)</span>
-                  <span className="font-mono text-white font-semibold">{selectedNode.details.phone}</span>
-                </div>
-              )}
-              {selectedNode.details?.email && (
-                <div className="flex justify-between px-3 py-2 text-[11px]">
-                  <span className="text-slate-400">Email</span>
-                  <span className="text-white font-semibold truncate max-w-[140px]">
-                    {selectedNode.details.email}
-                  </span>
-                </div>
-              )}
               <div className="flex justify-between px-3 py-2 text-[11px]">
                 <span className="text-slate-400">Risk Score</span>
                 <div className="flex items-center gap-2">
@@ -1965,58 +1592,54 @@ export default function IntelligenceGraph() {
               </div>
               {selectedNode.details?.remarks && (
                 <div className="px-3 py-2 text-[11px] space-y-1">
-                  <span className="text-slate-400 block">Remarks</span>
+                  <span className="text-slate-400 block font-medium">Forensic Remarks</span>
                   <p className="text-slate-200 leading-relaxed">{selectedNode.details.remarks}</p>
                 </div>
               )}
             </div>
 
-            {/* LINKED ENTITIES (COUNT BREAKDOWN) */}
+            {/* Linked Entities Breakdown */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  Linked Entities ({selectedNodeRelationships.length})
+                  Linked Relationships ({selectedNodeRelationships.length})
                 </span>
               </div>
               <div className="space-y-1.5">
-                {selectedNode.details?.linkedCounts ? (
-                  Object.entries(selectedNode.details.linkedCounts).map(([cat, count]) => (
-                    <div
-                      key={cat}
-                      className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-[#0D1533] border border-[#17203E] text-[11px]"
-                    >
-                      <div className="flex items-center gap-2 text-slate-300">
-                        {cat.includes('Phone') && <Phone className="w-3.5 h-3.5 text-blue-400" />}
-                        {cat.includes('Bank') && <Building2 className="w-3.5 h-3.5 text-emerald-400" />}
-                        {cat.includes('Email') && <Mail className="w-3.5 h-3.5 text-purple-400" />}
-                        {cat.includes('Device') && <Smartphone className="w-3.5 h-3.5 text-orange-400" />}
-                        {cat.includes('Location') && <MapPin className="w-3.5 h-3.5 text-teal-400" />}
-                        {cat.includes('IP') && <Monitor className="w-3.5 h-3.5 text-amber-400" />}
-                        {cat.includes('Person') && <User className="w-3.5 h-3.5 text-purple-400" />}
-                        <span>{cat}</span>
-                      </div>
-                      <span className="font-bold text-white font-mono">{count}</span>
+                {selectedNodeRelationships.slice(0, 5).map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between px-3 py-2 rounded-lg bg-[#0D1533] border border-[#17203E] text-[11px]"
+                  >
+                    <div className="flex items-center gap-2 text-slate-300 truncate">
+                      <span className="text-purple-400 font-bold font-mono">
+                        {item.edge.label || item.edge.type}
+                      </span>
+                      <span className="text-white font-semibold truncate">
+                        {item.connectedNode.label}
+                      </span>
                     </div>
-                  ))
-                ) : (
-                  <div className="text-slate-400 text-center py-2">No linked counts available</div>
-                )}
+                    <span className="text-[10px] text-slate-400 capitalize">{item.direction}</span>
+                  </div>
+                ))}
               </div>
 
-              <button
-                onClick={() => setShowAllRelModal(true)}
-                className="w-full mt-2 py-2 text-center text-xs font-semibold text-purple-400 hover:text-purple-300 hover:bg-purple-950/30 rounded-lg border border-purple-800/40 transition flex items-center justify-center gap-1.5"
-              >
-                <span>View All Relationships</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
+              {selectedNodeRelationships.length > 5 && (
+                <button
+                  onClick={() => setShowAllRelModal(true)}
+                  className="w-full mt-2 py-2 text-center text-xs font-semibold text-purple-400 hover:text-purple-300 hover:bg-purple-950/30 rounded-lg border border-purple-800/40 transition flex items-center justify-center gap-1.5"
+                >
+                  <span>View All {selectedNodeRelationships.length} Relationships</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
 
-            {/* QUICK INSIGHT AI BOX */}
+            {/* AI QUICK INSIGHT */}
             <div className="bg-[#12112C] border border-purple-800/60 rounded-xl p-3.5 space-y-2 shadow-lg shadow-purple-950/20">
               <div className="flex items-center gap-2 text-purple-300 text-xs font-bold">
                 <Sparkles className="w-4 h-4 text-amber-400" />
-                <span>QUICK INSIGHT</span>
+                <span>INTELLIGENCE INSIGHT</span>
               </div>
               <p className="text-[11px] text-slate-300 leading-relaxed">
                 {selectedNode.details?.quickInsight ||
@@ -2028,129 +1651,7 @@ export default function IntelligenceGraph() {
       )}
 
       {/* ==========================================
-          MODAL: MULTI-PERSON PATH TRACER (PERSON A, B, C...)
-          ========================================== */}
-      {isPathTracerOpen && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0D1533] border border-[#223164] rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#1A264E]">
-              <div className="flex items-center gap-2.5">
-                <GitBranch className="w-5 h-5 text-purple-400" />
-                <h3 className="text-base font-bold text-white">
-                  Multi-Person Collusion & Path Tracer
-                </h3>
-              </div>
-              <button
-                onClick={() => setIsPathTracerOpen(false)}
-                className="text-slate-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Select any two Persons or Entities to uncover all indirect transaction hops, shared bank accounts, phone calls, and co-located visits connecting them.
-              </p>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[11px] font-bold text-slate-400 block mb-1.5 uppercase">
-                    Starting Person / Entity
-                  </label>
-                  <select
-                    value={pathStartNode}
-                    onChange={e => setPathStartNode(e.target.value)}
-                    className="w-full rounded-lg border border-[#1F2A52] bg-[#070B1A] px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none"
-                  >
-                    {nodes.map(n => (
-                      <option key={n.id} value={n.id}>
-                        {n.label} ({n.type})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-bold text-slate-400 block mb-1.5 uppercase">
-                    Target Person / Entity
-                  </label>
-                  <select
-                    value={pathEndNode}
-                    onChange={e => setPathEndNode(e.target.value)}
-                    className="w-full rounded-lg border border-[#1F2A52] bg-[#070B1A] px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none"
-                  >
-                    {nodes.map(n => (
-                      <option key={n.id} value={n.id}>
-                        {n.label} ({n.type})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  onClick={() => handleTracePath(pathStartNode, pathEndNode)}
-                  className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold rounded-lg shadow-md transition flex items-center gap-1.5"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                  <span>Execute Path Trace</span>
-                </button>
-              </div>
-
-              {/* Traced Output Results */}
-              {tracedPathSteps.length > 0 && (
-                <div className="mt-4 bg-[#070C20] border border-[#1F2A52] rounded-xl p-4 space-y-3">
-                  <div className="flex items-center justify-between text-xs font-bold text-purple-300">
-                    <span>Identified Collusion Trail:</span>
-                    <span className="text-[10px] text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/60">
-                      {tracedPathSteps.length} Hop(s)
-                    </span>
-                  </div>
-
-                  <div className="space-y-2">
-                    {tracedPathSteps.map((step, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-start gap-2.5 text-xs bg-[#0C1430] p-2.5 rounded-lg border border-[#182348]"
-                      >
-                        <div className="w-5 h-5 rounded-full bg-purple-900/60 text-purple-300 font-bold flex items-center justify-center shrink-0 text-[10px]">
-                          {idx + 1}
-                        </div>
-                        <div className="flex-1">
-                          {step.from && step.to ? (
-                            <div className="flex items-center gap-2 text-white font-medium">
-                              <span>{step.from}</span>
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-700/60">
-                                {step.type}
-                              </span>
-                              <span>{step.to}</span>
-                            </div>
-                          ) : null}
-                          <p className="text-[11px] text-slate-300 mt-0.5">{step.desc}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="pt-2 flex justify-end">
-                    <button
-                      onClick={() => setIsPathTracerOpen(false)}
-                      className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg"
-                    >
-                      View on Canvas
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ==========================================
-          MODAL: ADD DYNAMIC PERSON / ENTITY / LINK
+          MODAL: ADD DYNAMIC LEAD / ENTITY
           ========================================== */}
       {isAddEntityOpen && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
@@ -2175,12 +1676,12 @@ export default function IntelligenceGraph() {
             <div className="p-6 space-y-3.5 text-xs">
               <div>
                 <label className="text-[11px] font-bold text-slate-400 block mb-1">
-                  Entity Name / Label
+                  Entity Value / Identifier
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Person D (Broker) or ICICI Account"
+                  placeholder="e.g. +91 99887 76655 or HDFC Account"
                   value={newEntityForm.label}
                   onChange={e => setNewEntityForm(prev => ({ ...prev, label: e.target.value }))}
                   className="w-full rounded-lg border border-[#1F2A52] bg-[#070B1A] px-3 py-2 text-white focus:border-purple-500 focus:outline-none"
@@ -2189,9 +1690,7 @@ export default function IntelligenceGraph() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[11px] font-bold text-slate-400 block mb-1">
-                    Entity Type
-                  </label>
+                  <label className="text-[11px] font-bold text-slate-400 block mb-1">Type</label>
                   <select
                     value={newEntityForm.type}
                     onChange={e => setNewEntityForm(prev => ({ ...prev, type: e.target.value }))}
@@ -2206,15 +1705,13 @@ export default function IntelligenceGraph() {
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-bold text-slate-400 block mb-1">
-                    Role in Crime
-                  </label>
+                  <label className="text-[11px] font-bold text-slate-400 block mb-1">Role</label>
                   <select
                     value={newEntityForm.role}
                     onChange={e => setNewEntityForm(prev => ({ ...prev, role: e.target.value }))}
                     className="w-full rounded-lg border border-[#1F2A52] bg-[#070B1A] px-3 py-2 text-white focus:border-purple-500 focus:outline-none"
                   >
-                    <option value="suspect">Suspect (High Risk)</option>
+                    <option value="suspect">Suspect</option>
                     <option value="associate">Associate / Mule</option>
                     <option value="normal">Witness / Channel</option>
                   </select>
@@ -2223,19 +1720,15 @@ export default function IntelligenceGraph() {
 
               <div className="pt-2 border-t border-[#1C264D]">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
-                  Link into Knowledge Graph
+                  Connect To Existing Entity
                 </span>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[11px] font-bold text-slate-400 block mb-1">
-                      Connect To
-                    </label>
+                    <label className="text-[11px] font-bold text-slate-400 block mb-1">Connect To</label>
                     <select
                       value={newEntityForm.connectTo}
-                      onChange={e =>
-                        setNewEntityForm(prev => ({ ...prev, connectTo: e.target.value }))
-                      }
+                      onChange={e => setNewEntityForm(prev => ({ ...prev, connectTo: e.target.value }))}
                       className="w-full rounded-lg border border-[#1F2A52] bg-[#070B1A] px-3 py-2 text-white focus:border-purple-500 focus:outline-none"
                     >
                       {nodes.map(n => (
@@ -2247,9 +1740,7 @@ export default function IntelligenceGraph() {
                   </div>
 
                   <div>
-                    <label className="text-[11px] font-bold text-slate-400 block mb-1">
-                      Relationship Type
-                    </label>
+                    <label className="text-[11px] font-bold text-slate-400 block mb-1">Relationship</label>
                     <select
                       value={newEntityForm.relType}
                       onChange={e => {
@@ -2294,7 +1785,7 @@ export default function IntelligenceGraph() {
       )}
 
       {/* ==========================================
-          MODAL: VIEW ALL RELATIONSHIPS TABLE
+          MODAL: VIEW ALL RELATIONSHIPS
           ========================================== */}
       {showAllRelModal && selectedNode && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
