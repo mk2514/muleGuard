@@ -217,12 +217,13 @@ export default function DataSource() {
         if (rows && rows.length > 0) {
           return rows.map((row, rIdx) => {
             const src = extractField(row, [
+              'accused_name', 'accused', 'suspect_name', 'suspect', 'culprit', 'person_name', 'name', 'account_holder_name', 'customer_name',
               'sender_name', 'sender_account', 'sender', 'from_account', 'from', 'payer',
               'calling_no', 'calling_number', 'a_party', 'source_account', 'source_ip', 'account_number', 'upi_id'
             ], `SRC_${rIdx + 1}`);
 
             const tgt = extractField(row, [
-              'beneficiary_name', 'beneficiary_account', 'beneficiary', 'bene', 'to_account', 'to', 'payee',
+              'beneficiary_name', 'accused_beneficiary', 'co_accused', 'beneficiary_account', 'beneficiary', 'bene', 'to_account', 'to', 'payee',
               'called_no', 'called_number', 'b_party', 'dest_account', 'destination_ip'
             ], `TGT_${rIdx + 1}`);
 
@@ -262,8 +263,8 @@ export default function DataSource() {
             source_file: file.name,
             file_extension: 'json',
             type: formData.sourceType || 'JSON_DATA',
-            source: row.source || row.sender || row.sender_name || `SRC_${rIdx + 1}`,
-            target: row.target || row.beneficiary || row.receiver || `TGT_${rIdx + 1}`,
+            source: row.source || row.accused_name || row.accused || row.suspect_name || row.suspect || row.sender || row.sender_name || `SRC_${rIdx + 1}`,
+            target: row.target || row.accused_beneficiary || row.co_accused || row.beneficiary || row.receiver || `TGT_${rIdx + 1}`,
             timestamp: row.timestamp || new Date().toISOString().replace('T', ' ').slice(0, 19),
             investigating_agency: formData.sourceOrg || 'Chandigarh Police Dept',
             ...row

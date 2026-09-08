@@ -44,6 +44,7 @@ import {
   Zap,
   Database
 } from 'lucide-react';
+import { resolveAccusedInfo, resolveAccusedName } from './Entities';
 
 // ==========================================
 // COLOR CONFIGURATION & VISUAL THEMES
@@ -774,20 +775,32 @@ export default function IntelligenceGraph() {
       else if (rawType.includes('ip')) mappedType = 'IP Address';
       else if (rawType.includes('org') || rawType.includes('company')) mappedType = 'Organization';
 
-      const isSuspect = ent.canonical_id === primarySuspectId;
+      const accusedInfo = resolveAccusedInfo(ent.canonical_value);
+      const isSuspect = ent.canonical_id === primarySuspectId || !!accusedInfo;
       const isAssociate = mappedType === 'Person' && !isSuspect;
 
       const recordCount = ent.linked_records?.length || 1;
       const relatedCount = ent.related_canonical_ids?.length || 0;
-      let calculatedRisk = isSuspect ? 92 : Math.min(94, 50 + recordCount * 4 + relatedCount * 5);
+      let calculatedRisk = accusedInfo ? 98 : isSuspect ? 92 : Math.min(94, 50 + recordCount * 4 + relatedCount * 5);
       if (mappedType === 'Bank Account' && recordCount > 3) calculatedRisk = 85;
 
       const riskLevel = calculatedRisk >= 80 ? 'High Risk' : calculatedRisk >= 60 ? 'Medium Risk' : 'Low Risk';
 
+      const resolvedLabel = accusedInfo ? `${accusedInfo.name} (${accusedInfo.role})` : resolveAccusedName(ent.canonical_value);
+      const subLabelText = accusedInfo
+        ? accusedInfo.badge
+        : isSuspect
+        ? '🚨 PRIMARY ACCUSED'
+        : isAssociate
+        ? '(Associate)'
+        : mappedType === 'Bank Account'
+        ? 'Mule Account'
+        : '';
+
       return {
         id: ent.canonical_id,
-        label: ent.canonical_value,
-        subLabel: isSuspect ? '(Suspect)' : isAssociate ? '(Associate)' : mappedType === 'Bank Account' ? 'Mule Account' : '',
+        label: resolvedLabel,
+        subLabel: subLabelText,
         type: mappedType,
         role: isSuspect ? 'suspect' : isAssociate ? 'associate' : 'normal',
         riskScore: calculatedRisk,
@@ -797,16 +810,18 @@ export default function IntelligenceGraph() {
         y: 350,
         details: {
           entityId: ent.canonical_id,
-          originalValues: ent.original_values || [ent.canonical_value],
+          originalValues: ent.original_values || [ent.canonical_value, resolvedLabel],
           linkedRecordsCount: recordCount,
-          remarks: `Synthesized from ${recordCount} processed record(s) in case ${caseId}.`,
+          remarks: accusedInfo
+            ? `Identified as ${accusedInfo.role} in syndicate network. Linked across ${recordCount} processed record(s).`
+            : `Synthesized from ${recordCount} processed record(s) in case ${caseId}.`,
           linkedCounts: {
             'Records Linked': recordCount,
             'Connected Entities': relatedCount
           },
           quickInsight: isSuspect
-            ? `${ent.canonical_value} is the primary node in this network with ${relatedCount} direct connections across uploaded case files.`
-            : `${ent.canonical_value} is linked to ${relatedCount} entities in this case.`
+            ? `${resolvedLabel} is the key suspect node in this syndicate network with ${relatedCount} direct connections.`
+            : `${resolvedLabel} is linked to ${relatedCount} entities in this case.`
         }
       };
     });

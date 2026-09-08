@@ -150,19 +150,21 @@ def map_and_normalize_record(row: Dict[str, Any], file_type: str, index: int, fi
 
     # 1. SOURCE ENTITY RESOLUTION
     source_keywords = [
+        "accused_name", "accused", "suspect_name", "suspect", "culprit",
         "sender_account_token", "sender_name", "upi_id", "bank_account_id",
         "calling_number_token", "mobile_number_token", "msisdn_token", "imei_token", "imsi_token", "calling_no", "a_party",
         "actor_entity_id", "source_ip", "src_ip", "user_id", "author_id", "sender_handle", "username"
     ]
-    source = get_first_match(source_keywords, default=f"UNKNOWN_SRC_{index+1}")
+    source = get_first_match(source_keywords, default=f"SRC_{index+1}")
 
     # 2. TARGET ENTITY RESOLUTION
     target_keywords = [
+        "accused_beneficiary", "co_accused",
         "beneficiary_account_token", "beneficiary_name", "merchant_id", "atm_terminal_id",
         "called_number_token", "called_no", "b_party",
         "subject_entity_id", "destination_ip", "dest_ip", "recipient_id", "to_handle"
     ]
-    target = get_first_match(target_keywords, default=f"UNKNOWN_TGT_{index+1}")
+    target = get_first_match(target_keywords, default=f"TGT_{index+1}")
 
     direction = get_first_match(["transaction_direction", "event_direction", "type", "txn_type"]).upper()
     if "CREDIT" in direction or "CR" in direction or "INBOUND" in direction:

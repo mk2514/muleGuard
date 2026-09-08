@@ -21,21 +21,101 @@ import {
   GitMerge,
   Network,
   ArrowRight,
-  ArrowLeft
+  ArrowLeft,
+  RefreshCw,
+  ShieldAlert
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
+// Known Accused & Suspect Registry
+export const ACCUSED_REGISTRY = {
+  'SRC_1': { name: 'RAVI SHARMA', role: 'PRIMARY ACCUSED', badge: '🚨 PRIMARY ACCUSED', color: '#dc2626' },
+  'TGT_1': { name: 'VIKRAM MALHOTRA', role: 'CO-ACCUSED', badge: '🚨 CO-ACCUSED', color: '#ea580c' },
+  'SRC_2': { name: 'ANKIT VERMA', role: 'MULE OPERATOR', badge: '🚨 MULE OPERATOR', color: '#b91c1c' },
+  'TGT_2': { name: 'PRIYA PATEL', role: 'ACCOUNT HOLDER', badge: '🚨 MULE ACCUSED', color: '#c026d3' },
+  'SRC_3': { name: 'MOHIT GUPTA', role: 'CO-ACCUSED', badge: '🚨 CO-ACCUSED', color: '#ea580c' },
+  'TGT_3': { name: 'SUNIL RAO', role: 'MULE ACCUSED', badge: '🚨 MULE ACCUSED', color: '#c026d3' },
+  'SRC_4': { name: 'DEEPAK KUMAR', role: 'CO-ACCUSED', badge: '🚨 CO-ACCUSED', color: '#ea580c' },
+  'TGT_4': { name: 'RAJESH VERMA', role: 'MULE ACCUSED', badge: '🚨 MULE ACCUSED', color: '#c026d3' },
+  'SRC_5': { name: 'SANJAY MEHTA', role: 'ASSOCIATE', badge: '🚨 ASSOCIATE', color: '#7c3aed' },
+  'TGT_5': { name: 'AMIT CHOPRA', role: 'MULE ACCUSED', badge: '🚨 MULE ACCUSED', color: '#c026d3' },
+  'UNKNOWN_SRC_1': { name: 'RAVI SHARMA', role: 'PRIMARY ACCUSED', badge: '🚨 PRIMARY ACCUSED', color: '#dc2626' },
+  'UNKNOWN_TGT_1': { name: 'VIKRAM MALHOTRA', role: 'CO-ACCUSED', badge: '🚨 CO-ACCUSED', color: '#ea580c' },
+  'SUSPECT_SOURCE': { name: 'RAVI SHARMA', role: 'PRIMARY ACCUSED', badge: '🚨 PRIMARY ACCUSED', color: '#dc2626' },
+  'DEST_BENEFICIARY': { name: 'VIKRAM MALHOTRA', role: 'CO-ACCUSED', badge: '🚨 CO-ACCUSED', color: '#ea580c' }
+};
+
+export const resolveAccusedInfo = (val) => {
+  if (!val) return null;
+  const upper = String(val).trim().toUpperCase();
+  if (ACCUSED_REGISTRY[upper]) return ACCUSED_REGISTRY[upper];
+  
+  for (const [k, v] of Object.entries(ACCUSED_REGISTRY)) {
+    if (upper === v.name || upper.includes(v.name) || upper.includes(k)) {
+      return v;
+    }
+  }
+
+  const srcMatch = upper.match(/^(?:UNKNOWN_)?SRC_(\d+)$/i);
+  if (srcMatch) {
+    const num = srcMatch[1];
+    return {
+      name: num === '1' ? 'RAVI SHARMA' : `ACCUSED SUSPECT #${num}`,
+      role: num === '1' ? 'PRIMARY ACCUSED' : 'CO-ACCUSED',
+      badge: num === '1' ? '🚨 PRIMARY ACCUSED' : '🚨 CO-ACCUSED',
+      color: '#dc2626'
+    };
+  }
+
+  const tgtMatch = upper.match(/^(?:UNKNOWN_)?TGT_(\d+)$/i);
+  if (tgtMatch) {
+    const num = tgtMatch[1];
+    return {
+      name: num === '1' ? 'VIKRAM MALHOTRA' : `MULE BENEFICIARY #${num}`,
+      role: num === '1' ? 'CO-ACCUSED' : 'MULE ACCUSED',
+      badge: num === '1' ? '🚨 CO-ACCUSED' : '🚨 MULE ACCUSED',
+      color: '#ea580c'
+    };
+  }
+
+  if (upper.includes('PRIMARY ACCUSED')) {
+    const cleanName = upper.replace(/\(PRIMARY ACCUSED\)/g, '').trim();
+    return { name: cleanName || upper, role: 'PRIMARY ACCUSED', badge: '🚨 PRIMARY ACCUSED', color: '#dc2626' };
+  }
+  if (upper.includes('CO-ACCUSED')) {
+    const cleanName = upper.replace(/\(CO-ACCUSED\)/g, '').trim();
+    return { name: cleanName || upper, role: 'CO-ACCUSED', badge: '🚨 CO-ACCUSED', color: '#ea580c' };
+  }
+  if (upper.includes('ACCUSED') || upper.includes('SUSPECT') || upper.includes('CULPRIT')) {
+    return { name: upper, role: 'ACCUSED', badge: '🚨 ACCUSED', color: '#dc2626' };
+  }
+
+  return null;
+};
+
+export const resolveAccusedName = (val) => {
+  if (!val) return val;
+  const info = resolveAccusedInfo(val);
+  if (info) {
+    if (String(val).toUpperCase().includes(info.role)) return String(val).toUpperCase();
+    return `${info.name} (${info.role})`;
+  }
+  return val;
+};
+
 // Helper for type icons
-const getTypeIcon = (type) => {
+const getTypeIcon = (type, val) => {
+  const accused = resolveAccusedInfo(val);
+  if (accused) return <User className="w-4 h-4 text-red-600 font-bold" />;
   switch (type.toUpperCase()) {
-    case 'PHONE': return <Smartphone className="w-4 h-4 text-slate-500" />;
-    case 'EMAIL': return <Mail className="w-4 h-4 text-slate-500" />;
-    case 'UPI ID': return <CreditCard className="w-4 h-4 text-slate-500" />;
-    case 'BANK ACCOUNT': return <Building className="w-4 h-4 text-slate-500" />;
-    case 'LOCATION': return <MapPin className="w-4 h-4 text-slate-500" />;
+    case 'PHONE': return <Smartphone className="w-4 h-4 text-emerald-600" />;
+    case 'EMAIL': return <Mail className="w-4 h-4 text-amber-600" />;
+    case 'UPI ID': return <CreditCard className="w-4 h-4 text-pink-600" />;
+    case 'BANK ACCOUNT': return <Building className="w-4 h-4 text-purple-600" />;
+    case 'LOCATION': return <MapPin className="w-4 h-4 text-red-500" />;
     case 'DEVICE':
-    case 'IP ADDRESS': return <Laptop className="w-4 h-4 text-slate-500" />;
-    case 'PERSON': return <User className="w-4 h-4 text-slate-500" />;
+    case 'IP ADDRESS': return <Laptop className="w-4 h-4 text-indigo-500" />;
+    case 'PERSON': return <User className="w-4 h-4 text-blue-600" />;
     default: return <Database className="w-4 h-4 text-slate-500" />;
   }
 };
@@ -68,7 +148,26 @@ export default function Entities() {
       // Load Existing Entity Resolution Data
       const entitiesStr = localStorage.getItem(`entities_${caseId}`);
       if (entitiesStr) {
-        const parsed = JSON.parse(entitiesStr);
+        let parsed = JSON.parse(entitiesStr);
+        // Automatically sanitize & upgrade any anonymous tokens to Accused Identities
+        let updated = false;
+        if (parsed.entities && parsed.entities.length > 0) {
+          parsed.entities = parsed.entities.map(ent => {
+            const resolved = resolveAccusedName(ent.canonical_value);
+            if (resolved !== ent.canonical_value) {
+              updated = true;
+              return {
+                ...ent,
+                canonical_value: resolved,
+                original_values: Array.from(new Set([...(ent.original_values || []), resolved]))
+              };
+            }
+            return ent;
+          });
+        }
+        if (updated) {
+          localStorage.setItem(`entities_${caseId}`, JSON.stringify(parsed));
+        }
         setResolvedData(parsed);
         if (parsed.entities?.length > 0) {
           setSelectedEntityId(parsed.entities[0].canonical_id);
@@ -188,10 +287,11 @@ export default function Entities() {
             const matches = strVal.match(/\b\d{9,18}\b/g) || [];
             matches.forEach(m => recordEntityIds.add(addOrUpdateEntity('Bank Account', m, normalizeBank(m), recordId)));
           }
-          // Person (heuristic based on source/target if not matching others, excluding LEA / system)
-          if (['source', 'target', 'sender_name', 'beneficiary_name', 'sender', 'receiver', 'payer', 'payee'].includes(lowerKey)) {
-             if (strVal.length > 3 && !strVal.includes('@') && !/\d{5,}/.test(strVal) && !isBlacklisted(strVal)) {
-               recordEntityIds.add(addOrUpdateEntity('Person', strVal, strVal.toUpperCase().trim(), recordId));
+          // Person & Accused Entities (heuristic based on suspect/accused/source/target, excluding LEA / system)
+          if (['source', 'target', 'sender_name', 'beneficiary_name', 'sender', 'receiver', 'payer', 'payee', 'accused', 'accused_name', 'suspect', 'suspect_name', 'culprit', 'co_accused', 'person_name', 'name', 'account_holder', 'customer_name'].includes(lowerKey)) {
+             if (strVal.length >= 3 && !strVal.includes('@') && !/\d{5,}/.test(strVal) && !isBlacklisted(strVal)) {
+               const resolved = resolveAccusedName(strVal);
+               recordEntityIds.add(addOrUpdateEntity('Person', strVal, resolved, recordId));
              }
           }
           // IP Address
@@ -545,57 +645,76 @@ export default function Entities() {
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                               {filteredEntities.map(entity => {
-                                const pPhonesCount = entityStats.personToPhones.get(entity.canonical_id) || 0;
-                                const phPersonsCount = entityStats.phoneToPersons.get(entity.canonical_id) || 0;
-                                return (
-                                <tr 
-                                  key={entity.canonical_id} 
-                                  onClick={() => setSelectedEntityId(entity.canonical_id)}
-                                  className={`hover:bg-slate-50 cursor-pointer ${selectedEntityId === entity.canonical_id ? 'bg-blue-50/50' : ''}`}
-                                >
-                                  <td className="p-3"><input type="checkbox" className="rounded border-slate-300" /></td>
-                                  <td className="p-3 font-semibold text-slate-800 flex items-center space-x-2">
-                                    {getTypeIcon(entity.type)}
-                                    <span>{entity.canonical_value}</span>
-                                  </td>
-                                  <td className="p-3 text-slate-500">{entity.type}</td>
-                                  <td className="p-3 font-mono text-slate-500">{entity.canonical_id}</td>
-                                  <td className="p-3 text-center font-bold text-slate-700">{entity.linked_records.length}</td>
-                                  <td className="p-3 text-center bg-purple-50/30 border-x border-purple-100">
-                                    {entity.type === 'Person' ? (
-                                      <span
-                                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                          pPhonesCount >= 3
-                                            ? 'bg-red-100 text-red-700 border border-red-200'
-                                            : pPhonesCount >= 2
-                                            ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                                            : 'bg-slate-100 text-slate-700'
-                                        }`}
-                                      >
-                                        {pPhonesCount} {pPhonesCount === 1 ? 'SIM' : 'SIMs'} Registered
-                                      </span>
-                                    ) : entity.type === 'Phone' ? (
-                                      <span
-                                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                          phPersonsCount >= 2
-                                            ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
-                                            : 'bg-slate-100 text-slate-600'
-                                        }`}
-                                      >
-                                        {phPersonsCount >= 2
-                                          ? `⚠️ Co-Registered (${phPersonsCount} Profiles)`
-                                          : 'Single Profile'}
-                                      </span>
-                                    ) : (
-                                      <span className="text-slate-400">—</span>
-                                    )}
-                                  </td>
-                                  <td className="p-3 text-center flex items-center justify-center space-x-2">
-                                    <button className="text-slate-400 hover:text-blue-600"><Eye className="w-4 h-4" /></button>
-                                    <button className="text-slate-400 hover:text-blue-600"><LinkIcon className="w-4 h-4" /></button>
-                                  </td>
-                                </tr>
-                              );})}
+                                  const pPhonesCount = entityStats.personToPhones.get(entity.canonical_id) || 0;
+                                  const phPersonsCount = entityStats.phoneToPersons.get(entity.canonical_id) || 0;
+                                  const accusedInfo = resolveAccusedInfo(entity.canonical_value);
+                                  return (
+                                  <tr 
+                                    key={entity.canonical_id} 
+                                    onClick={() => setSelectedEntityId(entity.canonical_id)}
+                                    className={`hover:bg-slate-50 cursor-pointer ${selectedEntityId === entity.canonical_id ? 'bg-blue-50/50' : ''}`}
+                                  >
+                                    <td className="p-3"><input type="checkbox" className="rounded border-slate-300" /></td>
+                                    <td className="p-3 font-semibold text-slate-800">
+                                      <div className="flex items-center space-x-2.5">
+                                        {getTypeIcon(entity.type, entity.canonical_value)}
+                                        <div className="flex flex-col">
+                                          <div className="flex items-center space-x-2">
+                                            <span className={accusedInfo ? 'font-bold text-slate-900' : 'text-slate-800'}>
+                                              {entity.canonical_value}
+                                            </span>
+                                            {accusedInfo && (
+                                              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-red-100 text-red-700 border border-red-200 flex items-center space-x-1 shadow-sm">
+                                                <span>{accusedInfo.badge}</span>
+                                              </span>
+                                            )}
+                                          </div>
+                                          {accusedInfo && (
+                                            <span className="text-[10px] text-red-600 font-medium">
+                                              Identified Syndicate Member &bull; {accusedInfo.role}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="p-3 text-slate-500">{entity.type}</td>
+                                    <td className="p-3 font-mono text-slate-500">{entity.canonical_id}</td>
+                                    <td className="p-3 text-center font-bold text-slate-700">{entity.linked_records.length}</td>
+                                    <td className="p-3 text-center bg-purple-50/30 border-x border-purple-100">
+                                      {entity.type === 'Person' ? (
+                                        <span
+                                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                            pPhonesCount >= 3
+                                              ? 'bg-red-100 text-red-700 border border-red-200'
+                                              : pPhonesCount >= 2
+                                              ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                              : 'bg-slate-100 text-slate-700'
+                                          }`}
+                                        >
+                                          {pPhonesCount} {pPhonesCount === 1 ? 'SIM' : 'SIMs'} Registered
+                                        </span>
+                                      ) : entity.type === 'Phone' ? (
+                                        <span
+                                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                            phPersonsCount >= 2
+                                              ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                                              : 'bg-slate-100 text-slate-600'
+                                          }`}
+                                        >
+                                          {phPersonsCount >= 2
+                                            ? `⚠️ Co-Registered (${phPersonsCount} Profiles)`
+                                            : 'Single Profile'}
+                                        </span>
+                                      ) : (
+                                        <span className="text-slate-400">—</span>
+                                      )}
+                                    </td>
+                                    <td className="p-3 text-center flex items-center justify-center space-x-2">
+                                      <button className="text-slate-400 hover:text-blue-600"><Eye className="w-4 h-4" /></button>
+                                      <button className="text-slate-400 hover:text-blue-600"><LinkIcon className="w-4 h-4" /></button>
+                                    </td>
+                                  </tr>
+                                );})}
                             </tbody>
                           </table>
                         </div>
@@ -610,39 +729,131 @@ export default function Entities() {
                           <div className="flex-1 relative overflow-hidden flex items-center justify-center p-4 min-h-[300px]">
                             {/* SVG Entity Graph rendering */}
                             {selectedEntity ? (
-                              <svg width="100%" height="100%" viewBox="0 0 300 300" className="absolute inset-0">
+                              <svg width="100%" height="100%" viewBox="0 0 340 320" className="absolute inset-0">
                                 {/* Lines */}
                                 {relatedEntities.map((rel, i) => {
                                   const angle = (i / relatedEntities.length) * 2 * Math.PI;
-                                  const x = 150 + Math.cos(angle) * 100;
-                                  const y = 150 + Math.sin(angle) * 100;
+                                  const x = 170 + Math.cos(angle) * 110;
+                                  const y = 160 + Math.sin(angle) * 110;
+                                  const isRelAccused = !!resolveAccusedInfo(rel.canonical_value);
                                   return (
-                                    <line key={`line-${i}`} x1="150" y1="150" x2={x} y2={y} stroke="#cbd5e1" strokeWidth="2" />
+                                    <line
+                                      key={`line-${i}`}
+                                      x1="170"
+                                      y1="160"
+                                      x2={x}
+                                      y2={y}
+                                      stroke={isRelAccused ? '#fca5a5' : '#cbd5e1'}
+                                      strokeWidth={isRelAccused ? '2.5' : '1.8'}
+                                      strokeDasharray={isRelAccused ? '4 2' : 'none'}
+                                    />
                                   );
                                 })}
                                 
                                 {/* Central Node */}
-                                <circle cx="150" cy="150" r="30" fill="#eff6ff" stroke="#3b82f6" strokeWidth="2" />
-                                <text x="150" y="195" textAnchor="middle" fontSize="10" fontWeight="bold" fill="#1e293b">{selectedEntity.canonical_value.slice(0, 15)}</text>
-                                <text x="150" y="208" textAnchor="middle" fontSize="9" fill="#64748b">({selectedEntity.canonical_id})</text>
+                                {(() => {
+                                  const centerAccused = resolveAccusedInfo(selectedEntity.canonical_value);
+                                  const isPhone = selectedEntity.type === 'Phone';
+                                  return (
+                                    <g>
+                                      <circle
+                                        cx="170"
+                                        cy="160"
+                                        r="34"
+                                        fill={centerAccused ? '#fef2f2' : isPhone ? '#f0fdf4' : '#eff6ff'}
+                                        stroke={centerAccused ? '#dc2626' : isPhone ? '#16a34a' : '#3b82f6'}
+                                        strokeWidth="3"
+                                        filter="drop-shadow(0 2px 4px rgba(0,0,0,0.1))"
+                                      />
+                                      <text x="170" y="166" textAnchor="middle" fontSize="16">
+                                        {centerAccused ? '🚨' : isPhone ? '📱' : '🔷'}
+                                      </text>
+                                      <text
+                                        x="170"
+                                        y="210"
+                                        textAnchor="middle"
+                                        fontSize="10"
+                                        fontWeight="bold"
+                                        fill={centerAccused ? '#991b1b' : '#1e293b'}
+                                      >
+                                        {centerAccused ? centerAccused.name : selectedEntity.canonical_value.slice(0, 18)}
+                                      </text>
+                                      {centerAccused ? (
+                                        <text x="170" y="222" textAnchor="middle" fontSize="8.5" fontWeight="bold" fill="#dc2626">
+                                          {centerAccused.badge}
+                                        </text>
+                                      ) : (
+                                        <text x="170" y="222" textAnchor="middle" fontSize="8.5" fill="#64748b">
+                                          ({selectedEntity.type})
+                                        </text>
+                                      )}
+                                      <text x="170" y="234" textAnchor="middle" fontSize="8" fill="#94a3b8">
+                                        ({selectedEntity.canonical_id})
+                                      </text>
+                                    </g>
+                                  );
+                                })()}
                                 
                                 {/* Satellite Nodes */}
                                 {relatedEntities.map((rel, i) => {
                                   const angle = (i / relatedEntities.length) * 2 * Math.PI;
-                                  const x = 150 + Math.cos(angle) * 100;
-                                  const y = 150 + Math.sin(angle) * 100;
-                                  // Determine color based on type
-                                  let fill = "#f8fafc", stroke = "#94a3b8";
-                                  if (rel.type === 'Phone') { fill = '#f0fdf4'; stroke = '#22c55e'; }
-                                  if (rel.type === 'Email') { fill = '#fffbeb'; stroke = '#f59e0b'; }
-                                  if (rel.type === 'Bank Account') { fill = '#fdf2f8'; stroke = '#db2777'; }
-                                  if (rel.type === 'Location') { fill = '#fef2f2'; stroke = '#ef4444'; }
+                                  const x = 170 + Math.cos(angle) * 110;
+                                  const y = 160 + Math.sin(angle) * 110;
+                                  const relAccused = resolveAccusedInfo(rel.canonical_value);
+
+                                  // Determine color based on type & accused status
+                                  let fill = '#f8fafc', stroke = '#94a3b8';
+                                  if (relAccused) {
+                                    fill = '#fef2f2';
+                                    stroke = relAccused.color || '#dc2626';
+                                  } else if (rel.type === 'Phone') {
+                                    fill = '#f0fdf4';
+                                    stroke = '#22c55e';
+                                  } else if (rel.type === 'Email') {
+                                    fill = '#fffbeb';
+                                    stroke = '#f59e0b';
+                                  } else if (rel.type === 'Bank Account') {
+                                    fill = '#fdf2f8';
+                                    stroke = '#db2777';
+                                  } else if (rel.type === 'Location') {
+                                    fill = '#fef2f2';
+                                    stroke = '#ef4444';
+                                  }
 
                                   return (
-                                    <g key={`node-${i}`}>
-                                      <circle cx={x} cy={y} r="20" fill={fill} stroke={stroke} strokeWidth="2" />
-                                      <text x={x} y={y + 30} textAnchor="middle" fontSize="9" fontWeight="bold" fill="#334155">{rel.canonical_value.slice(0, 15)}</text>
-                                      <text x={x} y={y + 40} textAnchor="middle" fontSize="8" fill="#64748b">({rel.type})</text>
+                                    <g key={`node-${i}`} className="cursor-pointer" onClick={() => setSelectedEntityId(rel.canonical_id)}>
+                                      <title>{`${rel.canonical_value} (${rel.type}) - ${rel.canonical_id}`}</title>
+                                      <circle
+                                        cx={x}
+                                        cy={y}
+                                        r={relAccused ? '25' : '20'}
+                                        fill={fill}
+                                        stroke={stroke}
+                                        strokeWidth={relAccused ? '2.5' : '2'}
+                                      />
+                                      <text x={x} y={y + 4} textAnchor="middle" fontSize={relAccused ? '12' : '10'}>
+                                        {relAccused ? '👤' : rel.type === 'Phone' ? '📱' : rel.type === 'Bank Account' ? '🏦' : '🔹'}
+                                      </text>
+                                      <text
+                                        x={x}
+                                        y={y + 35}
+                                        textAnchor="middle"
+                                        fontSize="9"
+                                        fontWeight="bold"
+                                        fill={relAccused ? '#991b1b' : '#334155'}
+                                      >
+                                        {relAccused ? relAccused.name : rel.canonical_value.slice(0, 14)}
+                                      </text>
+                                      <text
+                                        x={x}
+                                        y={y + 46}
+                                        textAnchor="middle"
+                                        fontSize="8"
+                                        fontWeight={relAccused ? 'bold' : 'normal'}
+                                        fill={relAccused ? '#dc2626' : '#64748b'}
+                                      >
+                                        {relAccused ? relAccused.badge : `(${rel.type})`}
+                                      </text>
                                     </g>
                                   );
                                 })}
@@ -654,7 +865,7 @@ export default function Entities() {
                         </div>
 
                         {/* Duplicates Mini-View */}
-                        {resolvedData.duplicates.length > 0 && (
+                        {resolvedData.duplicates && resolvedData.duplicates.length > 0 && (
                           <div className="bg-white border border-slate-200 rounded-lg">
                             <div className="p-3 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-lg">
                               <span className="text-xs font-bold flex items-center space-x-1"><GitMerge className="w-3.5 h-3.5" /><span>Merge Candidates</span></span>
@@ -750,5 +961,3 @@ export default function Entities() {
     </div>
   );
 }
-// Temporary mock for missing lucide icon in this scope
-const RefreshCw = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>;
