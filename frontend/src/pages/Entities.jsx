@@ -18,7 +18,8 @@ import {
   Laptop,
   Building,
   User,
-  GitMerge
+  GitMerge,
+  Network
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -333,12 +334,19 @@ export default function Entities() {
             </div>
             <p className="text-sm text-slate-500 mt-1">Unify, deduplicate and link entities across all data sources for this case.</p>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3">
             <div className="bg-white border border-slate-200 rounded-lg px-4 py-2 flex items-center space-x-2">
               <span className="text-xs text-slate-500 font-semibold">Case:</span>
               <span className="text-sm font-bold text-slate-800">{activeCaseId || 'No Case Selected'}</span>
               {activeCaseId && <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded">ACTIVE</span>}
             </div>
+            <button
+              onClick={() => navigate(`/graph?caseId=${activeCaseId}`)}
+              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold rounded-lg hover:from-purple-500 hover:to-indigo-500 flex items-center space-x-1.5 shadow-sm transition"
+            >
+              <Network className="w-4 h-4" />
+              <span>Explore in Intelligence Graph</span>
+            </button>
           </div>
         </div>
 
@@ -585,12 +593,18 @@ export default function Entities() {
                        </div>
                     </div>
                   )}
-                  {activeTab === 'Clusters' && (
+                   {activeTab === 'Clusters' && (
                     <div className="bg-white border border-slate-200 rounded-lg flex-1 p-6 flex flex-col items-center justify-center">
                        <Users className="w-12 h-12 text-slate-300 mb-4" />
                        <h3 className="text-lg font-bold text-slate-700">Cluster Analysis</h3>
                        <p className="text-sm text-slate-500 mt-2 max-w-md text-center">Network clusters represent distinct groups of highly connected entities interacting in this case.</p>
-                       <p className="text-xs text-slate-400 mt-1">Feature available in Graph Analysis module.</p>
+                       <button
+                         onClick={() => navigate(`/graph?caseId=${activeCaseId}`)}
+                         className="mt-4 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold rounded-lg hover:from-purple-500 hover:to-indigo-500 flex items-center space-x-2 shadow-md transition"
+                       >
+                         <Network className="w-4 h-4" />
+                         <span>Open Neo4j Intelligence Graph</span>
+                       </button>
                     </div>
                   )}
                 </div>
