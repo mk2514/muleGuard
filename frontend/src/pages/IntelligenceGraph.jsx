@@ -1040,6 +1040,24 @@ export default function IntelligenceGraph() {
   const isLockedRef = useRef(isLocked);
   isLockedRef.current = isLocked;
 
+  const isPanningRef = useRef(false);
+  const draggingNodeRef = useRef(null);
+  const pointerStartRef = useRef({ x: 0, y: 0 });
+  const panStartPosRef = useRef({ x: 0, y: 0 });
+  const hasMovedRef = useRef(false);
+
+  // Toggle Entity Details with guaranteed auto-selection of suspect node if none selected
+  const handleToggleDetails = useCallback(() => {
+    setIsDetailsOpen(prev => {
+      const next = !prev;
+      if (next && !selectedNodeId && nodes.length > 0) {
+        const primary = nodes.find(n => n.role === 'suspect') || nodes[0];
+        if (primary) setSelectedNodeId(primary.id);
+      }
+      return next;
+    });
+  }, [selectedNodeId, nodes]);
+
   // Canvas Panning via Pointer Events for robust tracking
   const handlePointerDownCanvas = (e) => {
     if (isLockedRef.current) return;
@@ -1052,28 +1070,71 @@ export default function IntelligenceGraph() {
       e.target.closest('select')
     ) return;
 
-    // Deselect if clicking on empty canvas
+    // Deselect edges on canvas click
     setSelectedEdgeId(null);
 
+    isPanningRef.current = true;
+    hasMovedRef.current = false;
+    pointerStartRef.current = { x: e.clientX, y: e.clientY };
+    panStartPosRef.current = { x: panRef.current.x, y: panRef.current.y };
     setIsPanning(true);
-    startPanRef.current = {
-      x: e.clientX - panRef.current.x,
-      y: e.clientY - panRef.current.y
-    };
   };
 
-  // Dedicated window-level listener for 100% reliable free panning & dragging
+  const handleStartNodeDrag = (e, nodeId, nodeX, nodeY) => {
+    e.stopPropagation();
+    draggingNodeRef.current = nodeId;
+    hasMovedRef.current = false;
+    pointerStartRef.current = { x: e.clientX, y: e.clientY };
+
+    if (canvasContainerRef.current) {
+      const rect = canvasContainerRef.current.getBoundingClientRect();
+      const mouseGraphX = (e.clientX - rect.left - panRef.current.x) / zoomRef.current;
+      const mouseGraphY = (e.clientY - rect.top - panRef.current.y) / zoomRef.current;
+      dragOffsetRef.current = {
+        x: mouseGraphX - nodeX,
+        y: mouseGraphY - nodeY
+      };
+    }
+    setDraggingNodeId(nodeId);
+  };
+
+  const handleNodePointerUp = () => {
+    setDraggingNodeId(null);
+  };
+
+  // High-performance window-level listener with RAF for buttery-smooth 120fps motion
   useEffect(() => {
-    if (!isPanning && !draggingNodeId) return;
+    let animFrameId = null;
 
     const onWindowPointerMove = (e) => {
-      if (isPanning && !isLockedRef.current) {
-        setPan({
-          x: Math.round(e.clientX - startPanRef.current.x),
-          y: Math.round(e.clientY - startPanRef.current.y)
-        });
-      } else if (draggingNodeId && canvasContainerRef.current) {
-        // Deterministic direct coordinate conversion (100% drift-free)
+      if (isPanningRef.current && !isLockedRef.current) {
+        const dx = e.clientX - pointerStartRef.current.x;
+        const dy = e.clientY - pointerStartRef.current.y;
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasMovedRef.current = true;
+
+        const newX = Math.round(panStartPosRef.current.x + dx);
+        const newY = Math.round(panStartPosRef.current.y + dy);
+
+        // Instant hardware-accelerated transform update on the SVG viewport group
+        if (viewportRef.current) {
+          viewportRef.current.setAttribute(
+            'transform',
+            `translate(${newX}, ${newY}) scale(${zoomRef.current})`
+          );
+        }
+
+        // Throttle React state update to animation frames for zero CPU starvation
+        if (!animFrameId) {
+          animFrameId = requestAnimationFrame(() => {
+            setPan({ x: newX, y: newY });
+            animFrameId = null;
+          });
+        }
+      } else if (draggingNodeRef.current && canvasContainerRef.current) {
+        const dx = e.clientX - pointerStartRef.current.x;
+        const dy = e.clientY - pointerStartRef.current.y;
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasMovedRef.current = true;
+
         const rect = canvasContainerRef.current.getBoundingClientRect();
         const currentPan = panRef.current;
         const currentZoom = zoomRef.current;
@@ -1082,57 +1143,59 @@ export default function IntelligenceGraph() {
         const newX = Math.round(mouseGraphX - dragOffsetRef.current.x);
         const newY = Math.round(mouseGraphY - dragOffsetRef.current.y);
 
-        setNodes(prev =>
-          prev.map(n => {
-            if (n.id === draggingNodeId) {
-              return {
-                ...n,
-                x: newX,
-                y: newY
-              };
-            }
-            return n;
-          })
-        );
+        const currentDragId = draggingNodeRef.current;
+        if (!animFrameId) {
+          animFrameId = requestAnimationFrame(() => {
+            setNodes(prev =>
+              prev.map(n => (n.id === currentDragId ? { ...n, x: newX, y: newY } : n))
+            );
+            animFrameId = null;
+          });
+        }
       }
     };
 
-    const onWindowPointerUp = () => {
-      setIsPanning(false);
-      setDraggingNodeId(null);
+    const onWindowPointerUp = (e) => {
+      if (animFrameId) {
+        cancelAnimationFrame(animFrameId);
+        animFrameId = null;
+      }
+
+      if (isPanningRef.current) {
+        const dx = e.clientX - pointerStartRef.current.x;
+        const dy = e.clientY - pointerStartRef.current.y;
+        const finalX = Math.round(panStartPosRef.current.x + dx);
+        const finalY = Math.round(panStartPosRef.current.y + dy);
+        setPan({ x: finalX, y: finalY });
+        isPanningRef.current = false;
+        setIsPanning(false);
+      }
+
+      if (draggingNodeRef.current) {
+        const nodeId = draggingNodeRef.current;
+        draggingNodeRef.current = null;
+        setDraggingNodeId(null);
+
+        // If the pointer barely moved, it's an intentional click! Open details!
+        if (!hasMovedRef.current) {
+          setSelectedNodeId(nodeId);
+          setSelectedEdgeId(null);
+          setIsDetailsOpen(true);
+        }
+      }
     };
 
-    window.addEventListener('pointermove', onWindowPointerMove);
+    window.addEventListener('pointermove', onWindowPointerMove, { passive: true });
     window.addEventListener('pointerup', onWindowPointerUp);
     window.addEventListener('pointercancel', onWindowPointerUp);
 
     return () => {
+      if (animFrameId) cancelAnimationFrame(animFrameId);
       window.removeEventListener('pointermove', onWindowPointerMove);
       window.removeEventListener('pointerup', onWindowPointerUp);
       window.removeEventListener('pointercancel', onWindowPointerUp);
     };
-  }, [isPanning, draggingNodeId]);
-
-  const handleStartNodeDrag = (e, nodeId, nodeX, nodeY) => {
-    e.stopPropagation();
-    setSelectedNodeId(nodeId);
-    setSelectedEdgeId(null);
-    setDraggingNodeId(nodeId);
-
-    if (canvasContainerRef.current) {
-      const rect = canvasContainerRef.current.getBoundingClientRect();
-      const mouseGraphX = (e.clientX - rect.left - pan.x) / zoom;
-      const mouseGraphY = (e.clientY - rect.top - pan.y) / zoom;
-      dragOffsetRef.current = {
-        x: mouseGraphX - nodeX,
-        y: mouseGraphY - nodeY
-      };
-    }
-  };
-
-  const handleNodePointerUp = () => {
-    setDraggingNodeId(null);
-  };
+  }, []);
 
   // ==========================================
   // KEYBOARD SHORTCUTS ENGINE
@@ -1818,7 +1881,7 @@ export default function IntelligenceGraph() {
 
               {/* Entity Details Open/Close Toggle Button */}
               <button
-                onClick={() => setIsDetailsOpen(!isDetailsOpen)}
+                onClick={handleToggleDetails}
                 title={isDetailsOpen ? 'Close Entity Details' : 'Open Entity Details'}
                 className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition flex items-center gap-1.5 ${
                   isDetailsOpen
@@ -1889,7 +1952,10 @@ export default function IntelligenceGraph() {
           <svg
             ref={svgRef}
             id="knowledge-graph-svg"
+            width="100%"
+            height="100%"
             className="w-full h-full block select-none"
+            style={{ pointerEvents: 'all' }}
             onPointerDown={handlePointerDownCanvas}
           >
             <defs>
@@ -2340,11 +2406,11 @@ export default function IntelligenceGraph() {
 
       {/* Floating Toggle Drawer Tab on Right Edge */}
       <button
-        onClick={() => setIsDetailsOpen(prev => !prev)}
+        onClick={handleToggleDetails}
         title={isDetailsOpen ? "Close Entity Details Panel" : "Open Entity Details Panel"}
-        className={`absolute right-0 top-1/2 -translate-y-1/2 z-20 px-1.5 py-3 rounded-l-xl ${theme.cardBg}/95 backdrop-blur-md border-l border-t border-b ${theme.borderHighlight} ${theme.textPrimary} shadow-2xl hover:bg-purple-900/40 flex flex-col items-center gap-1.5 text-[10px] font-bold tracking-wider uppercase transition`}
+        className={`fixed md:absolute right-0 top-1/2 -translate-y-1/2 z-40 px-2 py-3.5 rounded-l-xl ${theme.cardBg}/95 backdrop-blur-md border-l border-t border-b ${theme.borderHighlight} ${theme.textPrimary} shadow-2xl hover:bg-purple-900/40 flex flex-col items-center gap-1.5 text-[10px] font-bold tracking-wider uppercase transition cursor-pointer`}
       >
-        {isDetailsOpen ? <ChevronRight className="w-3.5 h-3.5 text-purple-400" /> : <ChevronLeft className="w-3.5 h-3.5 text-purple-400" />}
+        {isDetailsOpen ? <ChevronRight className="w-4 h-4 text-purple-400" /> : <ChevronLeft className="w-4 h-4 text-purple-400" />}
         <span style={{ writingMode: 'vertical-rl' }} className="rotate-180 text-[10px] text-purple-300">
           {isDetailsOpen ? 'HIDE' : 'DETAILS'}
         </span>
@@ -2355,10 +2421,10 @@ export default function IntelligenceGraph() {
           Slides in/out cleanly without resizing the canvas or pushing the graph!
           ========================================== */}
       <aside
-        className={`absolute right-0 top-0 bottom-0 w-80 md:w-96 flex flex-col border-l ${theme.border} ${theme.sidebarBg} shadow-2xl z-30 transition-transform duration-300 ease-in-out ${
-          isDetailsOpen && (selectedNode || selectedEdge)
-            ? 'translate-x-0'
-            : 'translate-x-full pointer-events-none'
+        className={`fixed md:absolute right-0 top-0 bottom-0 w-80 md:w-96 flex flex-col border-l ${theme.border} ${theme.sidebarBg} shadow-2xl z-50 transition-all duration-300 ease-in-out ${
+          isDetailsOpen
+            ? 'translate-x-0 opacity-100'
+            : 'translate-x-full opacity-0 pointer-events-none'
         }`}
       >
         <div className={`flex items-center justify-between px-4 py-3.5 border-b ${theme.border}`}>
@@ -2528,7 +2594,28 @@ export default function IntelligenceGraph() {
                 </p>
               </div>
             </>
-          ) : null}
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-purple-950/80 border border-purple-500 text-purple-400 flex items-center justify-center mx-auto shadow-lg">
+                <User className="w-6 h-6" />
+              </div>
+              <div className="text-sm font-bold">No Entity Selected</div>
+              <p className={`text-xs ${theme.textSecondary}`}>
+                Select an entity node on the graph to inspect its full dossier, risk score, and relationships.
+              </p>
+              {nodes.length > 0 && (
+                <button
+                  onClick={() => {
+                    const primary = nodes.find(n => n.role === 'suspect') || nodes[0];
+                    if (primary) setSelectedNodeId(primary.id);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow transition"
+                >
+                  Select Primary Suspect ({nodes.find(n => n.role === 'suspect')?.label || nodes[0]?.label})
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </aside>
 
