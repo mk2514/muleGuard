@@ -37,6 +37,7 @@ import {
   Cpu
 } from 'lucide-react';
 import { FRAUD_SCENARIOS, CODEWORD_CATEGORIES, CASES } from '../lib/constants';
+import { getApiUrl } from '../config/api';
 
 export default function AdaptiveAnomalyEngine() {
   const navigate = useNavigate();
@@ -253,7 +254,7 @@ export default function AdaptiveAnomalyEngine() {
 
     let backendSuccess = false;
     try {
-      const apiUrls = ['http://127.0.0.1:8000/api/anomaly/detect', '/api/anomaly/detect'];
+      const apiUrls = [getApiUrl('/api/anomaly/detect'), '/api/anomaly/detect'];
       let res = null;
 
       for (const url of apiUrls) {

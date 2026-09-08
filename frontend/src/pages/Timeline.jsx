@@ -30,8 +30,11 @@ import {
   Layers,
   BarChart3,
   GitCommit,
-  Share2
+  Share2,
+  Plus,
+  RefreshCw
 } from 'lucide-react';
+import { getApiUrl } from '../config/api';
 
 export default function Timeline() {
   const [searchParams] = useSearchParams();
@@ -71,7 +74,7 @@ export default function Timeline() {
   useEffect(() => {
     const fetchTimeline = async () => {
       try {
-        const res = await fetch(`http://127.0.0.1:8000/api/timeline/${activeCaseId}`);
+        const res = await fetch(getApiUrl(`/api/timeline/${activeCaseId}`));
         if (res.ok) {
           const data = await res.json();
           if (data && data.events && data.events.length > 0) {

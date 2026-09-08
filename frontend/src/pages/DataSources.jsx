@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { processImageFile } from '../utils/ocrProcessor';
 import * as XLSX from 'xlsx';
+import { getApiUrl } from '../config/api';
 
 export default function DataSource() {
   const navigate = useNavigate();
@@ -357,7 +358,7 @@ export default function DataSource() {
       payload.append("timezone", formData.timezone);
       payload.append("extracted_records", JSON.stringify(processedRecords));
 
-      const response = await fetch("http://127.0.0.1:8000/upload/csv", {
+      const response = await fetch(getApiUrl("/upload/csv"), {
         method: "POST",
         body: payload,
       });

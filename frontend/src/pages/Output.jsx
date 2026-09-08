@@ -17,6 +17,7 @@ import {
   Network
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { getApiUrl } from '../config/api';
 
 export default function Output() {
   const location = useLocation();
@@ -109,7 +110,7 @@ export default function Output() {
 
         // Stage 2: Synchronize permanently into backend SQLite database
         try {
-          const apiUrls = ['http://127.0.0.1:8000/api/db/sync', '/api/db/sync'];
+          const apiUrls = [getApiUrl('/api/db/sync'), '/api/db/sync'];
           for (const url of apiUrls) {
             fetch(url, {
               method: 'POST',

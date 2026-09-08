@@ -34,6 +34,7 @@ import {
   PlusCircle,
   Database
 } from 'lucide-react';
+import { getApiUrl } from '../config/api';
 
 export default function ChainOfCustody() {
   const [searchParams] = useSearchParams();
@@ -106,7 +107,7 @@ export default function ChainOfCustody() {
     // 4. Fetch custody logs from SQLite backend
     const fetchLogs = async () => {
       try {
-        const res = await fetch(`http://127.0.0.1:8000/api/custody/${activeCaseId}`);
+        const res = await fetch(getApiUrl(`/api/custody/${activeCaseId}`));
         if (res.ok) {
           const data = await res.json();
           if (data.logs && data.logs.length > 0) {
@@ -209,7 +210,7 @@ export default function ChainOfCustody() {
     };
 
     try {
-      await fetch('http://127.0.0.1:8000/api/custody/log', {
+      await fetch(getApiUrl('/api/custody/log'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

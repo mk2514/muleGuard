@@ -45,6 +45,7 @@ import {
   Database
 } from 'lucide-react';
 import { resolveAccusedInfo, resolveAccusedName } from './Entities';
+import { getApiUrl } from '../config/api';
 
 // ==========================================
 // COLOR CONFIGURATION & VISUAL THEMES
@@ -1308,7 +1309,7 @@ export default function IntelligenceGraph() {
     setIsSyncingNeo4j(true);
     setNeo4jFeedback(null);
     try {
-      const apiUrls = ['http://127.0.0.1:8000/api/neo4j/sync', '/api/neo4j/sync'];
+      const apiUrls = [getApiUrl('/api/neo4j/sync'), '/api/neo4j/sync'];
       let synced = false;
       for (const url of apiUrls) {
         try {

@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "muleguard.db")
+DB_PATH = os.getenv("DATABASE_PATH") or os.path.join(os.path.dirname(__file__), "muleguard.db")
 
 
 def get_db_connection():

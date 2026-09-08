@@ -26,6 +26,7 @@ import {
   ShieldAlert
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { getApiUrl } from '../config/api';
 
 // Known Accused & Suspect Registry
 export const ACCUSED_REGISTRY = {
@@ -377,7 +378,7 @@ export default function Entities() {
 
       // Stage 2: Synchronize canonical entities to SQLite backend
       try {
-        const apiUrls = ['http://127.0.0.1:8000/api/db/sync', '/api/db/sync'];
+        const apiUrls = [getApiUrl('/api/db/sync'), '/api/db/sync'];
         for (const url of apiUrls) {
           fetch(url, {
             method: 'POST',
