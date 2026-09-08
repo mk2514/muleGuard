@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  ArrowDown,
   Search,
   Download,
   Maximize2,
@@ -25,12 +28,12 @@ import {
   X,
   Sparkles,
   ChevronRight,
+  ChevronLeft,
   Share2,
   Layers,
   FileText,
   Calendar,
   Network,
-  ArrowRight,
   Filter,
   SlidersHorizontal,
   Info,
@@ -38,8 +41,7 @@ import {
   Eye,
   EyeOff,
   Radio,
-  Zap,
-  ChevronLeft
+  Zap
 } from 'lucide-react';
 
 // ==========================================
@@ -343,6 +345,10 @@ export default function IntelligenceGraph() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
 
+  // Modals & Panels (Open/Close according to user wish)
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
+
   // Refs
   const canvasContainerRef = useRef(null);
   const svgRef = useRef(null);
@@ -459,8 +465,8 @@ export default function IntelligenceGraph() {
     const targetNodes = (nodeList && nodeList.length > 0) ? nodeList : nodes;
     if (!targetNodes || targetNodes.length === 0) return;
 
-    const w = dimensions.width || 1000;
-    const h = dimensions.height || 700;
+    const w = canvasContainerRef.current?.clientWidth || dimensions.width || 1000;
+    const h = canvasContainerRef.current?.clientHeight || dimensions.height || 700;
 
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     targetNodes.forEach(n => {
@@ -471,13 +477,13 @@ export default function IntelligenceGraph() {
     });
 
     // Add adequate margin for text labels and node glows
-    const marginX = 140;
-    const marginY = 120;
+    const marginX = 160;
+    const marginY = 140;
     const graphW = Math.max(200, maxX - minX + marginX);
     const graphH = Math.max(200, maxY - minY + marginY);
 
-    const fitScale = Math.min((w - 40) / graphW, (h - 40) / graphH, 1.25);
-    const safeZoom = Math.min(Math.max(fitScale, 0.35), 1.6);
+    const fitScale = Math.min((w - 60) / graphW, (h - 60) / graphH, 1.25);
+    const safeZoom = Math.min(Math.max(fitScale, 0.45), 1.25);
 
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
@@ -541,8 +547,21 @@ export default function IntelligenceGraph() {
         // Ring 3: Infrastructure / Auxiliary
         const iIdx = infra.findIndex(i => i.id === node.id);
         const totalI = Math.max(1, infra.length);
+        if (totalI > 8) {
+          // Multi-tiered staggered rings for cases with many entities (e.g. 22 locations)
+          const tier = iIdx % 3;
+          const tierRadius = 310 + tier * 130;
+          const tierCount = Math.ceil(totalI / 3);
+          const tierIdx = Math.floor(iIdx / 3);
+          const angle = (tierIdx / Math.max(1, tierCount)) * 2 * Math.PI + tier * 0.45;
+          return {
+            ...node,
+            x: Math.round(cx + Math.cos(angle) * tierRadius),
+            y: Math.round(cy + Math.sin(angle) * tierRadius)
+          };
+        }
         const angle = (iIdx / totalI) * 2 * Math.PI;
-        const r = 360 + (iIdx % 2) * 55;
+        const r = 320 + (iIdx % 2) * 50;
         return {
           ...node,
           x: Math.round(cx + Math.cos(angle) * r),
@@ -634,11 +653,12 @@ export default function IntelligenceGraph() {
           setNodes(positionedNodes);
           setEdges(dynamicEdges);
 
-          // Select primary suspect or highest risk
+          // Set primary node reference without forcing details panel open on load
           const primary = positionedNodes.find(n => n.role === 'suspect') || positionedNodes[0];
           if (primary) setSelectedNodeId(primary.id);
+          setIsDetailsOpen(false); // DEFAULT TO CLOSED (Opens according to user wish)
 
-          setTimeout(() => fitGraphToScreen(positionedNodes), 50);
+          setTimeout(() => fitGraphToScreen(positionedNodes), 100);
           return true;
         }
       } catch (err) {
@@ -1013,76 +1033,91 @@ export default function IntelligenceGraph() {
     applyZoom(factor, e.clientX, e.clientY);
   };
 
+  const panRef = useRef(pan);
+  panRef.current = pan;
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+  const isLockedRef = useRef(isLocked);
+  isLockedRef.current = isLocked;
+
   // Canvas Panning via Pointer Events for robust tracking
   const handlePointerDownCanvas = (e) => {
-    if (isLocked) return;
-    // Don't pan if clicking on a node or edge directly
-    if (e.target.closest('[data-node-id]') || e.target.closest('[data-edge-id]')) return;
+    if (isLockedRef.current) return;
+    // Don't pan if clicking on interactive controls
+    if (
+      e.target.closest('[data-node-id]') ||
+      e.target.closest('[data-edge-id]') ||
+      e.target.closest('button') ||
+      e.target.closest('input') ||
+      e.target.closest('select')
+    ) return;
 
     // Deselect if clicking on empty canvas
     setSelectedEdgeId(null);
 
     setIsPanning(true);
     startPanRef.current = {
-      x: e.clientX - pan.x,
-      y: e.clientY - pan.y
+      x: e.clientX - panRef.current.x,
+      y: e.clientY - panRef.current.y
     };
-    if (canvasContainerRef.current) {
-      canvasContainerRef.current.setPointerCapture?.(e.pointerId);
-    }
   };
 
-  const handlePointerMove = (e) => {
-    if (isPanning && !isLocked) {
-      setPan({
-        x: e.clientX - startPanRef.current.x,
-        y: e.clientY - startPanRef.current.y
-      });
-    } else if (draggingNodeId && canvasContainerRef.current) {
-      // Deterministic direct coordinate conversion (100% drift-free)
-      const rect = canvasContainerRef.current.getBoundingClientRect();
-      const mouseGraphX = (e.clientX - rect.left - pan.x) / zoom;
-      const mouseGraphY = (e.clientY - rect.top - pan.y) / zoom;
-      const newX = Math.round(mouseGraphX - dragOffsetRef.current.x);
-      const newY = Math.round(mouseGraphY - dragOffsetRef.current.y);
+  // Dedicated window-level listener for 100% reliable free panning & dragging
+  useEffect(() => {
+    if (!isPanning && !draggingNodeId) return;
 
-      setNodes(prev =>
-        prev.map(n => {
-          if (n.id === draggingNodeId) {
-            return {
-              ...n,
-              x: newX,
-              y: newY
-            };
-          }
-          return n;
-        })
-      );
-    }
-  };
+    const onWindowPointerMove = (e) => {
+      if (isPanning && !isLockedRef.current) {
+        setPan({
+          x: Math.round(e.clientX - startPanRef.current.x),
+          y: Math.round(e.clientY - startPanRef.current.y)
+        });
+      } else if (draggingNodeId && canvasContainerRef.current) {
+        // Deterministic direct coordinate conversion (100% drift-free)
+        const rect = canvasContainerRef.current.getBoundingClientRect();
+        const currentPan = panRef.current;
+        const currentZoom = zoomRef.current;
+        const mouseGraphX = (e.clientX - rect.left - currentPan.x) / currentZoom;
+        const mouseGraphY = (e.clientY - rect.top - currentPan.y) / currentZoom;
+        const newX = Math.round(mouseGraphX - dragOffsetRef.current.x);
+        const newY = Math.round(mouseGraphY - dragOffsetRef.current.y);
 
-  const handlePointerUp = (e) => {
-    setIsPanning(false);
-    setDraggingNodeId(null);
-    try {
-      if (canvasContainerRef.current) {
-        canvasContainerRef.current.releasePointerCapture?.(e.pointerId);
+        setNodes(prev =>
+          prev.map(n => {
+            if (n.id === draggingNodeId) {
+              return {
+                ...n,
+                x: newX,
+                y: newY
+              };
+            }
+            return n;
+          })
+        );
       }
-    } catch {
-      // Ignored if pointer wasn't captured
-    }
-  };
+    };
+
+    const onWindowPointerUp = () => {
+      setIsPanning(false);
+      setDraggingNodeId(null);
+    };
+
+    window.addEventListener('pointermove', onWindowPointerMove);
+    window.addEventListener('pointerup', onWindowPointerUp);
+    window.addEventListener('pointercancel', onWindowPointerUp);
+
+    return () => {
+      window.removeEventListener('pointermove', onWindowPointerMove);
+      window.removeEventListener('pointerup', onWindowPointerUp);
+      window.removeEventListener('pointercancel', onWindowPointerUp);
+    };
+  }, [isPanning, draggingNodeId]);
 
   const handleStartNodeDrag = (e, nodeId, nodeX, nodeY) => {
     e.stopPropagation();
     setSelectedNodeId(nodeId);
     setSelectedEdgeId(null);
     setDraggingNodeId(nodeId);
-
-    // Keep pointer captured on this node so fast mouse movements never slip
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch {}
 
     if (canvasContainerRef.current) {
       const rect = canvasContainerRef.current.getBoundingClientRect();
@@ -1095,13 +1130,8 @@ export default function IntelligenceGraph() {
     }
   };
 
-  const handleNodePointerUp = (e) => {
-    if (draggingNodeId) {
-      try {
-        e.currentTarget.releasePointerCapture(e.pointerId);
-      } catch {}
-      setDraggingNodeId(null);
-    }
+  const handleNodePointerUp = () => {
+    setDraggingNodeId(null);
   };
 
   // ==========================================
@@ -1171,10 +1201,16 @@ export default function IntelligenceGraph() {
           e.preventDefault();
           setSelectedNodeId(null);
           setSelectedEdgeId(null);
+          setIsDetailsOpen(false);
           setSearchQuery('');
           setIsAddEntityOpen(false);
           setShowAllRelModal(false);
           setIsShortcutsOpen(false);
+          break;
+        case 'i':
+        case 'I':
+          e.preventDefault();
+          setIsDetailsOpen(prev => !prev);
           break;
         case 'l':
         case 'L':
@@ -1411,13 +1447,15 @@ export default function IntelligenceGraph() {
   return (
     <div
       className={`flex h-full w-full overflow-hidden font-sans select-none relative ${theme.bg} ${theme.textPrimary}`}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
     >
       {/* ==========================================
           LEFT SIDEBAR: METRICS & CONTROLS
           ========================================== */}
-      <aside className={`w-64 shrink-0 flex flex-col border-r ${theme.border} ${theme.sidebarBg} z-20`}>
+      <aside
+        className={`${
+          isLeftSidebarOpen ? 'w-64' : 'w-0 overflow-hidden border-r-0'
+        } shrink-0 flex flex-col border-r ${theme.border} ${theme.sidebarBg} z-20 transition-all duration-300`}
+      >
         <div className={`flex items-center gap-3 px-4 py-3.5 border-b ${theme.border}`}>
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-tr from-purple-700 via-indigo-600 to-blue-500 shadow-md shadow-purple-900/40">
             <Network className="h-5 w-5 text-white" />
@@ -1746,6 +1784,17 @@ export default function IntelligenceGraph() {
 
             {/* Viewport Quick Buttons */}
             <div className={`flex items-center gap-1 border-l ${theme.border} pl-3`}>
+              {/* Left sidebar toggle */}
+              <button
+                onClick={() => setIsLeftSidebarOpen(!isLeftSidebarOpen)}
+                title={isLeftSidebarOpen ? 'Hide Left Panel' : 'Show Left Panel'}
+                className={`p-1.5 rounded-lg transition ${
+                  isLeftSidebarOpen ? 'text-purple-400 bg-purple-950/40' : `${theme.textMuted} hover:${theme.buttonHover}`
+                }`}
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+              </button>
+
               {/* Labels Toggle Key */}
               <button
                 onClick={() => setShowLabels(!showLabels)}
@@ -1757,6 +1806,7 @@ export default function IntelligenceGraph() {
                 {showLabels ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
               </button>
 
+              {/* Center & Fit All Entities */}
               <button
                 onClick={() => fitGraphToScreen(visibleNodes)}
                 title="Fit All Entities to Screen (0 or R or F)"
@@ -1764,6 +1814,25 @@ export default function IntelligenceGraph() {
               >
                 <RotateCcw className="w-3 h-3" />
                 <span>Fit All (F)</span>
+              </button>
+
+              {/* Entity Details Open/Close Toggle Button */}
+              <button
+                onClick={() => setIsDetailsOpen(!isDetailsOpen)}
+                title={isDetailsOpen ? 'Close Entity Details' : 'Open Entity Details'}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition flex items-center gap-1.5 ${
+                  isDetailsOpen
+                    ? 'bg-purple-600 border-purple-500 text-white shadow-sm'
+                    : 'bg-purple-950/40 border-purple-800/50 text-purple-300 hover:bg-purple-900/50'
+                }`}
+              >
+                <Info className="w-3.5 h-3.5" />
+                <span>Entity Details</span>
+                {selectedNode && (
+                  <span className="max-w-[90px] truncate text-[10px] px-1.5 py-0.5 bg-purple-900/80 rounded border border-purple-700 text-white">
+                    {selectedNode.label}
+                  </span>
+                )}
               </button>
 
               <button
@@ -1797,11 +1866,12 @@ export default function IntelligenceGraph() {
         <div
           ref={canvasContainerRef}
           id="graph-canvas-bg"
-          className="flex-1 relative overflow-hidden cursor-grab active:cursor-grabbing"
+          className="flex-1 relative overflow-hidden cursor-grab active:cursor-grabbing select-none"
           style={{
             backgroundColor: theme.canvasBg,
             backgroundImage: `radial-gradient(${theme.gridDot} 1px, transparent 1px)`,
-            backgroundSize: '28px 28px'
+            backgroundSize: '28px 28px',
+            touchAction: 'none'
           }}
           onPointerDown={handlePointerDownCanvas}
           onWheel={handleWheel}
@@ -1813,14 +1883,14 @@ export default function IntelligenceGraph() {
           {/* Quick Helpful Navigation Hint Badge */}
           <div className={`absolute top-3 left-1/2 -translate-x-1/2 ${theme.cardBg}/90 backdrop-blur-md border ${theme.borderHighlight} px-3.5 py-1 rounded-full text-[11px] ${theme.textSecondary} shadow-xl flex items-center gap-2 pointer-events-none z-10`}>
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Scroll / Pinch to Zoom • Drag any entity or label to move freely • Double-click to zoom in</span>
+            <span>Click & Drag Canvas to Pan • Drag Any Entity to Move • Scroll to Zoom</span>
           </div>
 
           <svg
             ref={svgRef}
             id="knowledge-graph-svg"
-            viewBox={`0 0 ${dimensions.width} ${dimensions.height}`}
-            className="w-full h-full block"
+            className="w-full h-full block select-none"
+            onPointerDown={handlePointerDownCanvas}
           >
             <defs>
               <filter id="glow-red" x="-50%" y="-50%" width="200%" height="200%">
@@ -1854,7 +1924,14 @@ export default function IntelligenceGraph() {
             </defs>
 
             {/* Click-capturing transparent backdrop inside SVG */}
-            <rect width="100%" height="100%" fill="transparent" />
+            <rect
+              width="100%"
+              height="100%"
+              fill="transparent"
+              pointerEvents="all"
+              className="cursor-grab active:cursor-grabbing"
+              onPointerDown={handlePointerDownCanvas}
+            />
 
             {/* Master Transform Group for Pan & Zoom */}
             <g
@@ -1888,6 +1965,7 @@ export default function IntelligenceGraph() {
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedEdgeId(edge.id);
+                        setIsDetailsOpen(true);
                       }}
                     >
                       {/* Wider invisible stroke for easy clicking */}
@@ -1969,6 +2047,7 @@ export default function IntelligenceGraph() {
                         e.stopPropagation();
                         setSelectedNodeId(node.id);
                         setSelectedEdgeId(null);
+                        setIsDetailsOpen(true);
                       }}
                     >
                       {/* Pulsing Aura for Primary Suspect / Search Match */}
@@ -2160,6 +2239,40 @@ export default function IntelligenceGraph() {
 
             <div className={`h-6 w-px ${theme.border}`} />
 
+            {/* Directional Canvas Pan Controls */}
+            <div className="flex items-center gap-0.5">
+              <button
+                onClick={() => setPan(p => ({ ...p, x: p.x + 80 }))}
+                title="Pan Left (A or Left Arrow)"
+                className={`p-1.5 rounded-lg ${theme.buttonBg} hover:${theme.buttonHover} ${theme.textSecondary} hover:${theme.textPrimary} transition`}
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setPan(p => ({ ...p, y: p.y + 80 }))}
+                title="Pan Up (W or Up Arrow)"
+                className={`p-1.5 rounded-lg ${theme.buttonBg} hover:${theme.buttonHover} ${theme.textSecondary} hover:${theme.textPrimary} transition`}
+              >
+                <ArrowUp className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setPan(p => ({ ...p, y: p.y - 80 }))}
+                title="Pan Down (S or Down Arrow)"
+                className={`p-1.5 rounded-lg ${theme.buttonBg} hover:${theme.buttonHover} ${theme.textSecondary} hover:${theme.textPrimary} transition`}
+              >
+                <ArrowDown className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setPan(p => ({ ...p, x: p.x - 80 }))}
+                title="Pan Right (D or Right Arrow)"
+                className={`p-1.5 rounded-lg ${theme.buttonBg} hover:${theme.buttonHover} ${theme.textSecondary} hover:${theme.textPrimary} transition`}
+              >
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className={`h-6 w-px ${theme.border}`} />
+
             {/* Pan Lock Toggle */}
             <button
               onClick={() => setIsLocked(!isLocked)}
@@ -2225,181 +2338,199 @@ export default function IntelligenceGraph() {
         </div>
       </main>
 
+      {/* Floating Toggle Drawer Tab on Right Edge */}
+      <button
+        onClick={() => setIsDetailsOpen(prev => !prev)}
+        title={isDetailsOpen ? "Close Entity Details Panel" : "Open Entity Details Panel"}
+        className={`absolute right-0 top-1/2 -translate-y-1/2 z-20 px-1.5 py-3 rounded-l-xl ${theme.cardBg}/95 backdrop-blur-md border-l border-t border-b ${theme.borderHighlight} ${theme.textPrimary} shadow-2xl hover:bg-purple-900/40 flex flex-col items-center gap-1.5 text-[10px] font-bold tracking-wider uppercase transition`}
+      >
+        {isDetailsOpen ? <ChevronRight className="w-3.5 h-3.5 text-purple-400" /> : <ChevronLeft className="w-3.5 h-3.5 text-purple-400" />}
+        <span style={{ writingMode: 'vertical-rl' }} className="rotate-180 text-[10px] text-purple-300">
+          {isDetailsOpen ? 'HIDE' : 'DETAILS'}
+        </span>
+      </button>
+
       {/* ==========================================
-          RIGHT SIDEBAR: ENTITY / EDGE DETAILS & DOSSIER
+          RIGHT DRAWER: ENTITY / EDGE DETAILS & DOSSIER
+          Slides in/out cleanly without resizing the canvas or pushing the graph!
           ========================================== */}
-      {(selectedNode || selectedEdge) && (
-        <aside className={`w-80 shrink-0 flex flex-col border-l ${theme.border} ${theme.sidebarBg} z-20`}>
-          <div className={`flex items-center justify-between px-4 py-3.5 border-b ${theme.border}`}>
+      <aside
+        className={`absolute right-0 top-0 bottom-0 w-80 md:w-96 flex flex-col border-l ${theme.border} ${theme.sidebarBg} shadow-2xl z-30 transition-transform duration-300 ease-in-out ${
+          isDetailsOpen && (selectedNode || selectedEdge)
+            ? 'translate-x-0'
+            : 'translate-x-full pointer-events-none'
+        }`}
+      >
+        <div className={`flex items-center justify-between px-4 py-3.5 border-b ${theme.border}`}>
+          <div className="flex items-center gap-2">
+            <Info className="w-4 h-4 text-purple-400" />
             <span className={`text-xs font-bold ${theme.textMuted} uppercase tracking-wider`}>
               {selectedEdge ? 'Relationship Details' : 'Entity Details'}
             </span>
-            <button
-              onClick={() => {
-                setSelectedNodeId(null);
-                setSelectedEdgeId(null);
-              }}
-              className={`${theme.textSecondary} hover:${theme.textPrimary} p-1 rounded transition`}
-            >
-              <X className="w-4 h-4" />
-            </button>
           </div>
+          <button
+            onClick={() => setIsDetailsOpen(false)}
+            title="Close Details Panel"
+            className={`${theme.textSecondary} hover:${theme.textPrimary} hover:bg-white/10 p-1 rounded-lg transition`}
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar text-xs">
-            {/* If an Edge is selected */}
-            {selectedEdge ? (
-              <div className="space-y-4">
-                <div className="p-3.5 rounded-xl bg-purple-950/20 border border-purple-800/40 space-y-2">
-                  <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider block">
-                    Relationship Link
-                  </span>
-                  <h3 className="text-base font-bold">{selectedEdge.label || selectedEdge.type}</h3>
-                  <p className={`text-xs ${theme.textSecondary}`}>
-                    Type: <strong className="text-purple-400">{selectedEdge.type}</strong>
-                  </p>
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar text-xs">
+          {/* If an Edge is selected */}
+          {selectedEdge ? (
+            <div className="space-y-4">
+              <div className="p-3.5 rounded-xl bg-purple-950/20 border border-purple-800/40 space-y-2">
+                <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider block">
+                  Relationship Link
+                </span>
+                <h3 className="text-base font-bold">{selectedEdge.label || selectedEdge.type}</h3>
+                <p className={`text-xs ${theme.textSecondary}`}>
+                  Type: <strong className="text-purple-400">{selectedEdge.type}</strong>
+                </p>
+              </div>
+
+              <div className={`${theme.cardBg} rounded-lg border ${theme.border} divide-y ${theme.panelDivide}`}>
+                <div className="p-3">
+                  <span className={`text-[10px] uppercase font-bold ${theme.textMuted} block mb-1`}>Source Node</span>
+                  <div className="font-semibold">{nodeMap.get(selectedEdge.source)?.label || selectedEdge.source}</div>
+                  <div className={`text-[10px] ${theme.textSecondary}`}>{nodeMap.get(selectedEdge.source)?.type}</div>
                 </div>
-
-                <div className={`${theme.cardBg} rounded-lg border ${theme.border} divide-y ${theme.panelDivide}`}>
+                <div className="p-3">
+                  <span className={`text-[10px] uppercase font-bold ${theme.textMuted} block mb-1`}>Target Node</span>
+                  <div className="font-semibold">{nodeMap.get(selectedEdge.target)?.label || selectedEdge.target}</div>
+                  <div className={`text-[10px] ${theme.textSecondary}`}>{nodeMap.get(selectedEdge.target)?.type}</div>
+                </div>
+                {selectedEdge.details && (
                   <div className="p-3">
-                    <span className={`text-[10px] uppercase font-bold ${theme.textMuted} block mb-1`}>Source Node</span>
-                    <div className="font-semibold">{nodeMap.get(selectedEdge.source)?.label || selectedEdge.source}</div>
-                    <div className={`text-[10px] ${theme.textSecondary}`}>{nodeMap.get(selectedEdge.source)?.type}</div>
+                    <span className={`text-[10px] uppercase font-bold ${theme.textMuted} block mb-1`}>Evidence Log</span>
+                    <p className={`leading-relaxed ${theme.textSecondary}`}>{selectedEdge.details}</p>
                   </div>
-                  <div className="p-3">
-                    <span className={`text-[10px] uppercase font-bold ${theme.textMuted} block mb-1`}>Target Node</span>
-                    <div className="font-semibold">{nodeMap.get(selectedEdge.target)?.label || selectedEdge.target}</div>
-                    <div className={`text-[10px] ${theme.textSecondary}`}>{nodeMap.get(selectedEdge.target)?.type}</div>
+                )}
+                <div className="p-3 flex justify-between">
+                  <span className={theme.textMuted}>Activity Recency</span>
+                  <span className="font-semibold text-purple-400">{selectedEdge.daysAgo || 1} day(s) ago</span>
+                </div>
+              </div>
+            </div>
+          ) : selectedNode ? (
+            <>
+              {/* Profile Header */}
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-12 h-12 rounded-full flex items-center justify-center border-2 shadow-lg ${
+                    selectedNode.role === 'suspect'
+                      ? 'bg-red-950/80 border-red-500 text-red-400 shadow-red-900/40'
+                      : 'bg-purple-950/80 border-purple-500 text-purple-400 shadow-purple-900/40'
+                  }`}
+                >
+                  {React.createElement(TYPE_CONFIG[selectedNode.type]?.icon || User, { className: 'w-6 h-6' })}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-base font-bold truncate">{selectedNode.label}</h3>
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        selectedNode.riskLevel === 'High Risk'
+                          ? 'bg-red-950 text-red-400 border border-red-800'
+                          : 'bg-amber-950 text-amber-400 border border-amber-800'
+                      }`}
+                    >
+                      {selectedNode.riskLevel}
+                    </span>
                   </div>
-                  {selectedEdge.details && (
-                    <div className="p-3">
-                      <span className={`text-[10px] uppercase font-bold ${theme.textMuted} block mb-1`}>Evidence Log</span>
-                      <p className={`leading-relaxed ${theme.textSecondary}`}>{selectedEdge.details}</p>
-                    </div>
-                  )}
-                  <div className="p-3 flex justify-between">
-                    <span className={theme.textMuted}>Activity Recency</span>
-                    <span className="font-semibold text-purple-400">{selectedEdge.daysAgo || 1} day(s) ago</span>
+                  <div className={`text-[11px] ${theme.textSecondary} font-medium`}>
+                    {selectedNode.type} {selectedNode.subLabel}
                   </div>
                 </div>
               </div>
-            ) : selectedNode ? (
-              <>
-                {/* Profile Header */}
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`w-12 h-12 rounded-full flex items-center justify-center border-2 shadow-lg ${
-                      selectedNode.role === 'suspect'
-                        ? 'bg-red-950/80 border-red-500 text-red-400 shadow-red-900/40'
-                        : 'bg-purple-950/80 border-purple-500 text-purple-400 shadow-purple-900/40'
-                    }`}
-                  >
-                    {React.createElement(TYPE_CONFIG[selectedNode.type]?.icon || User, { className: 'w-6 h-6' })}
+
+              {/* Attributes Key-Value */}
+              <div className={`${theme.cardBg} rounded-lg border ${theme.border} divide-y ${theme.panelDivide}`}>
+                <div className="flex justify-between px-3 py-2 text-[11px]">
+                  <span className={theme.textMuted}>Canonical ID</span>
+                  <span className="font-mono font-semibold">{selectedNode.details?.entityId}</span>
+                </div>
+                <div className="flex justify-between px-3 py-2 text-[11px]">
+                  <span className={theme.textMuted}>Risk Score</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-16 h-1.5 bg-slate-700/50 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-red-500 rounded-full"
+                        style={{ width: `${selectedNode.riskScore}%` }}
+                      />
+                    </div>
+                    <span className="font-bold text-red-400">{selectedNode.riskScore}%</span>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-base font-bold truncate">{selectedNode.label}</h3>
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          selectedNode.riskLevel === 'High Risk'
-                            ? 'bg-red-950 text-red-400 border border-red-800'
-                            : 'bg-amber-950 text-amber-400 border border-amber-800'
-                        }`}
+                </div>
+                {selectedNode.details?.remarks && (
+                  <div className="px-3 py-2 text-[11px] space-y-1">
+                    <span className={`${theme.textMuted} block font-medium`}>Remarks</span>
+                    <p className={`leading-relaxed ${theme.textSecondary}`}>{selectedNode.details.remarks}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Dynamic Linked Relationships Breakdown */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className={`text-[10px] font-bold ${theme.textMuted} uppercase tracking-wider`}>
+                    Linked Relationships ({selectedNodeRelationships.length})
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  {selectedNodeRelationships.length > 0 ? (
+                    selectedNodeRelationships.slice(0, 5).map((item, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => setSelectedEdgeId(item.edge.id)}
+                        className={`flex items-center justify-between px-3 py-2 rounded-lg ${theme.cardBg} border ${theme.border} hover:${theme.buttonHover} cursor-pointer text-[11px] transition`}
                       >
-                        {selectedNode.riskLevel}
-                      </span>
-                    </div>
-                    <div className={`text-[11px] ${theme.textSecondary} font-medium`}>
-                      {selectedNode.type} {selectedNode.subLabel}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Attributes Key-Value */}
-                <div className={`${theme.cardBg} rounded-lg border ${theme.border} divide-y ${theme.panelDivide}`}>
-                  <div className="flex justify-between px-3 py-2 text-[11px]">
-                    <span className={theme.textMuted}>Canonical ID</span>
-                    <span className="font-mono font-semibold">{selectedNode.details?.entityId}</span>
-                  </div>
-                  <div className="flex justify-between px-3 py-2 text-[11px]">
-                    <span className={theme.textMuted}>Risk Score</span>
-                    <div className="flex items-center gap-2">
-                      <div className="w-16 h-1.5 bg-slate-700/50 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-red-500 rounded-full"
-                          style={{ width: `${selectedNode.riskScore}%` }}
-                        />
-                      </div>
-                      <span className="font-bold text-red-400">{selectedNode.riskScore}%</span>
-                    </div>
-                  </div>
-                  {selectedNode.details?.remarks && (
-                    <div className="px-3 py-2 text-[11px] space-y-1">
-                      <span className={`${theme.textMuted} block font-medium`}>Remarks</span>
-                      <p className={`leading-relaxed ${theme.textSecondary}`}>{selectedNode.details.remarks}</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Dynamic Linked Relationships Breakdown */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className={`text-[10px] font-bold ${theme.textMuted} uppercase tracking-wider`}>
-                      Linked Relationships ({selectedNodeRelationships.length})
-                    </span>
-                  </div>
-                  <div className="space-y-1.5">
-                    {selectedNodeRelationships.length > 0 ? (
-                      selectedNodeRelationships.slice(0, 5).map((item, idx) => (
-                        <div
-                          key={idx}
-                          onClick={() => setSelectedEdgeId(item.edge.id)}
-                          className={`flex items-center justify-between px-3 py-2 rounded-lg ${theme.cardBg} border ${theme.border} hover:${theme.buttonHover} cursor-pointer text-[11px] transition`}
-                        >
-                          <div className="flex items-center gap-2 truncate">
-                            <span className="text-purple-400 font-bold font-mono">
-                              {item.edge.label || item.edge.type}
-                            </span>
-                            <span className="font-semibold truncate">
-                              {item.connectedNode.label}
-                            </span>
-                          </div>
-                          <span className={`text-[10px] ${theme.textMuted} capitalize`}>{item.direction}</span>
+                        <div className="flex items-center gap-2 truncate">
+                          <span className="text-purple-400 font-bold font-mono">
+                            {item.edge.label || item.edge.type}
+                          </span>
+                          <span className="font-semibold truncate">
+                            {item.connectedNode.label}
+                          </span>
                         </div>
-                      ))
-                    ) : (
-                      <div className={`p-3 ${theme.cardBg} rounded-lg border ${theme.border} ${theme.textMuted} text-center`}>
-                        No connected links found for this entity.
+                        <span className={`text-[10px] ${theme.textMuted} capitalize`}>{item.direction}</span>
                       </div>
-                    )}
-                  </div>
-
-                  {selectedNodeRelationships.length > 5 && (
-                    <button
-                      onClick={() => setShowAllRelModal(true)}
-                      className="w-full mt-2 py-2 text-center text-xs font-semibold text-purple-400 hover:text-purple-300 hover:bg-purple-950/30 rounded-lg border border-purple-800/40 transition flex items-center justify-center gap-1.5"
-                    >
-                      <span>View All {selectedNodeRelationships.length} Relationships</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
+                    ))
+                  ) : (
+                    <div className={`p-3 ${theme.cardBg} rounded-lg border ${theme.border} ${theme.textMuted} text-center`}>
+                      No connected links found for this entity.
+                    </div>
                   )}
                 </div>
 
-                {/* AI Intelligence Insight */}
-                <div className="bg-purple-950/20 border border-purple-800/50 rounded-xl p-3.5 space-y-2 shadow-lg shadow-purple-950/20">
-                  <div className="flex items-center gap-2 text-purple-400 text-xs font-bold">
-                    <Sparkles className="w-4 h-4 text-amber-400" />
-                    <span>INTELLIGENCE INSIGHT</span>
-                  </div>
-                  <p className={`text-[11px] ${theme.textSecondary} leading-relaxed`}>
-                    {selectedNode.details?.quickInsight ||
-                      `${selectedNode.label} exhibits strong centrality in this investigation. High degree of correlation with criminal infrastructure.`}
-                  </p>
+                {selectedNodeRelationships.length > 5 && (
+                  <button
+                    onClick={() => setShowAllRelModal(true)}
+                    className="w-full mt-2 py-2 text-center text-xs font-semibold text-purple-400 hover:text-purple-300 hover:bg-purple-950/30 rounded-lg border border-purple-800/40 transition flex items-center justify-center gap-1.5"
+                  >
+                    <span>View All {selectedNodeRelationships.length} Relationships</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* AI Intelligence Insight */}
+              <div className="bg-purple-950/20 border border-purple-800/50 rounded-xl p-3.5 space-y-2 shadow-lg shadow-purple-950/20">
+                <div className="flex items-center gap-2 text-purple-400 text-xs font-bold">
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  <span>INTELLIGENCE INSIGHT</span>
                 </div>
-              </>
-            ) : null}
-          </div>
-        </aside>
-      )}
+                <p className={`text-[11px] ${theme.textSecondary} leading-relaxed`}>
+                  {selectedNode.details?.quickInsight ||
+                    `${selectedNode.label} exhibits strong centrality in this investigation. High degree of correlation with criminal infrastructure.`}
+                </p>
+              </div>
+            </>
+          ) : null}
+        </div>
+      </aside>
 
       {/* ==========================================
           MODAL: KEYBOARD SHORTCUTS REFERENCE (?)
