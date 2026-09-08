@@ -962,6 +962,7 @@ export default function IntelligenceGraph() {
   }, [searchQuery, matchingNodeIds, nodes, zoom, dimensions]);
 
   // ==========================================
+  // ==========================================
   // CURSOR-ANCHORED ZOOMING & PANNING
   // ==========================================
   const applyZoom = useCallback((factor, clientX, clientY) => {
@@ -972,8 +973,8 @@ export default function IntelligenceGraph() {
     const mouseY = clientY !== undefined ? clientY - rect.top : rect.height / 2;
 
     setZoom(prevZoom => {
-      const newZoom = Math.min(Math.max(prevZoom * factor, 0.25), 3.5);
-      if (newZoom === prevZoom) return prevZoom;
+      const newZoom = Math.min(Math.max(prevZoom * factor, 0.15), 4.5);
+      if (Math.abs(newZoom - prevZoom) < 0.001) return prevZoom;
 
       setPan(prevPan => {
         const scaleChange = newZoom / prevZoom;
@@ -987,9 +988,28 @@ export default function IntelligenceGraph() {
     });
   }, []);
 
+  const handleZoomSliderChange = (e) => {
+    const targetZoom = parseFloat(e.target.value);
+    if (!canvasContainerRef.current) return;
+    const rect = canvasContainerRef.current.getBoundingClientRect();
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+
+    setZoom(prevZoom => {
+      const scaleChange = targetZoom / prevZoom;
+      setPan(prevPan => ({
+        x: Math.round(centerX - (centerX - prevPan.x) * scaleChange),
+        y: Math.round(centerY - (centerY - prevPan.y) * scaleChange)
+      }));
+      return targetZoom;
+    });
+  };
+
   const handleWheel = (e) => {
     e.preventDefault();
-    const factor = e.deltaY < 0 ? 1.15 : 0.87;
+    // Exponential smoothing for natural feel on both trackpads & notched mouse wheels
+    const intensity = e.ctrlKey ? 0.015 : 0.0025;
+    const factor = Math.exp(-e.deltaY * intensity);
     applyZoom(factor, e.clientX, e.clientY);
   };
 
@@ -1018,20 +1038,21 @@ export default function IntelligenceGraph() {
         x: e.clientX - startPanRef.current.x,
         y: e.clientY - startPanRef.current.y
       });
-    } else if (draggingNodeId && viewportRef.current && svgRef.current) {
-      const svg = svgRef.current;
-      const pt = svg.createSVGPoint();
-      pt.x = e.clientX;
-      pt.y = e.clientY;
-      const svgPoint = pt.matrixTransform(viewportRef.current.getScreenCTM().inverse());
+    } else if (draggingNodeId && canvasContainerRef.current) {
+      // Deterministic direct coordinate conversion (100% drift-free)
+      const rect = canvasContainerRef.current.getBoundingClientRect();
+      const mouseGraphX = (e.clientX - rect.left - pan.x) / zoom;
+      const mouseGraphY = (e.clientY - rect.top - pan.y) / zoom;
+      const newX = Math.round(mouseGraphX - dragOffsetRef.current.x);
+      const newY = Math.round(mouseGraphY - dragOffsetRef.current.y);
 
       setNodes(prev =>
         prev.map(n => {
           if (n.id === draggingNodeId) {
             return {
               ...n,
-              x: Math.round(svgPoint.x - dragOffsetRef.current.x),
-              y: Math.round(svgPoint.y - dragOffsetRef.current.y)
+              x: newX,
+              y: newY
             };
           }
           return n;
@@ -1058,15 +1079,28 @@ export default function IntelligenceGraph() {
     setSelectedEdgeId(null);
     setDraggingNodeId(nodeId);
 
-    if (viewportRef.current && svgRef.current) {
-      const pt = svgRef.current.createSVGPoint();
-      pt.x = e.clientX;
-      pt.y = e.clientY;
-      const svgPoint = pt.matrixTransform(viewportRef.current.getScreenCTM().inverse());
+    // Keep pointer captured on this node so fast mouse movements never slip
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {}
+
+    if (canvasContainerRef.current) {
+      const rect = canvasContainerRef.current.getBoundingClientRect();
+      const mouseGraphX = (e.clientX - rect.left - pan.x) / zoom;
+      const mouseGraphY = (e.clientY - rect.top - pan.y) / zoom;
       dragOffsetRef.current = {
-        x: svgPoint.x - nodeX,
-        y: svgPoint.y - nodeY
+        x: mouseGraphX - nodeX,
+        y: mouseGraphY - nodeY
       };
+    }
+  };
+
+  const handleNodePointerUp = (e) => {
+    if (draggingNodeId) {
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {}
+      setDraggingNodeId(null);
     }
   };
 
@@ -1771,7 +1805,17 @@ export default function IntelligenceGraph() {
           }}
           onPointerDown={handlePointerDownCanvas}
           onWheel={handleWheel}
+          onDoubleClick={(e) => {
+            e.preventDefault();
+            applyZoom(e.shiftKey ? 0.75 : 1.35, e.clientX, e.clientY);
+          }}
         >
+          {/* Quick Helpful Navigation Hint Badge */}
+          <div className={`absolute top-3 left-1/2 -translate-x-1/2 ${theme.cardBg}/90 backdrop-blur-md border ${theme.borderHighlight} px-3.5 py-1 rounded-full text-[11px] ${theme.textSecondary} shadow-xl flex items-center gap-2 pointer-events-none z-10`}>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Scroll / Pinch to Zoom • Drag any entity or label to move freely • Double-click to zoom in</span>
+          </div>
+
           <svg
             ref={svgRef}
             id="knowledge-graph-svg"
@@ -1914,9 +1958,11 @@ export default function IntelligenceGraph() {
                       key={node.id}
                       data-node-id={node.id}
                       transform={`translate(${node.x}, ${node.y})`}
-                      className="cursor-pointer"
+                      className={`transition-opacity ${draggingNodeId === node.id ? 'cursor-grabbing' : 'cursor-grab'}`}
+                      style={{ touchAction: 'none' }}
                       opacity={isDimmed ? 0.25 : 1}
                       onPointerDown={e => handleStartNodeDrag(e, node.id, node.x, node.y)}
+                      onPointerUp={handleNodePointerUp}
                       onMouseEnter={() => setHoveredNodeId(node.id)}
                       onMouseLeave={() => setHoveredNodeId(null)}
                       onClick={(e) => {
@@ -2028,35 +2074,98 @@ export default function IntelligenceGraph() {
             </g>
           </svg>
 
-          {/* Floating Canvas Controls (Bottom-Left) */}
-          <div className={`absolute bottom-6 left-6 flex flex-col gap-1.5 ${theme.cardBg}/90 backdrop-blur-md p-1.5 rounded-xl border ${theme.border} shadow-xl z-10`}>
+          {/* Floating Canvas Controls (Bottom-Left) - Rich Zoom Hub */}
+          <div className={`absolute bottom-6 left-6 flex items-center gap-2 ${theme.cardBg}/95 backdrop-blur-md px-3 py-2 rounded-2xl border ${theme.borderHighlight} shadow-2xl z-20`}>
+            {/* Zoom Out Button */}
             <button
-              onClick={() => applyZoom(1.2)}
-              title="Zoom In (+)"
-              className={`p-2 ${theme.textSecondary} hover:${theme.textPrimary} hover:${theme.buttonHover} rounded-lg transition`}
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => applyZoom(0.83)}
-              title="Zoom Out (-)"
-              className={`p-2 ${theme.textSecondary} hover:${theme.textPrimary} hover:${theme.buttonHover} rounded-lg transition`}
+              onClick={() => applyZoom(0.8)}
+              title="Zoom Out (- or Scroll Down)"
+              className={`p-2 ${theme.textSecondary} hover:${theme.textPrimary} hover:${theme.buttonHover} rounded-xl transition active:scale-95`}
             >
               <Minus className="w-4 h-4" />
             </button>
-            <div className={`h-px w-full ${theme.border}`} />
+
+            {/* Interactive Zoom Slider */}
+            <div className="flex items-center gap-2 px-1">
+              <input
+                type="range"
+                min="0.2"
+                max="3.0"
+                step="0.05"
+                value={zoom}
+                onChange={handleZoomSliderChange}
+                className="w-24 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                title={`Zoom Level: ${Math.round(zoom * 100)}%`}
+              />
+              {/* Zoom Percentage Reset Pill */}
+              <button
+                onClick={() => {
+                  if (!canvasContainerRef.current) return;
+                  const rect = canvasContainerRef.current.getBoundingClientRect();
+                  applyZoom(1.0 / zoom, rect.width / 2, rect.height / 2);
+                }}
+                title="Click to Reset Zoom to 100%"
+                className="px-2 py-1 rounded-lg text-[11px] font-mono font-bold bg-purple-950/60 text-purple-300 border border-purple-800/60 hover:bg-purple-900 transition"
+              >
+                {Math.round(zoom * 100)}%
+              </button>
+            </div>
+
+            {/* Zoom In Button */}
             <button
-              onClick={() => fitGraphToScreen(visibleNodes)}
-              title="Fit to Screen (0 or R or F)"
-              className={`p-2 ${theme.textSecondary} hover:${theme.textPrimary} hover:${theme.buttonHover} rounded-lg transition`}
+              onClick={() => applyZoom(1.25)}
+              title="Zoom In (+ or Scroll Up)"
+              className={`p-2 ${theme.textSecondary} hover:${theme.textPrimary} hover:${theme.buttonHover} rounded-xl transition active:scale-95`}
             >
-              <RotateCcw className="w-4 h-4" />
+              <Plus className="w-4 h-4" />
             </button>
+
+            <div className={`h-6 w-px ${theme.border}`} />
+
+            {/* Quick Zoom Presets */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => fitGraphToScreen(visibleNodes)}
+                title="Fit All Entities to Screen (F or 0)"
+                className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg border ${theme.border} ${theme.buttonBg} ${theme.buttonHover} text-slate-200 transition flex items-center gap-1`}
+              >
+                <RotateCcw className="w-3 h-3 text-purple-400" />
+                <span>Fit</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  if (!canvasContainerRef.current) return;
+                  const rect = canvasContainerRef.current.getBoundingClientRect();
+                  applyZoom(0.5 / zoom, rect.width / 2, rect.height / 2);
+                }}
+                title="Zoom 50%"
+                className={`px-2 py-1 text-[10px] font-semibold rounded-lg ${theme.buttonBg} hover:${theme.buttonHover} ${theme.textSecondary} transition`}
+              >
+                50%
+              </button>
+
+              <button
+                onClick={() => {
+                  if (!canvasContainerRef.current) return;
+                  const rect = canvasContainerRef.current.getBoundingClientRect();
+                  applyZoom(1.5 / zoom, rect.width / 2, rect.height / 2);
+                }}
+                title="Zoom 150%"
+                className={`px-2 py-1 text-[10px] font-semibold rounded-lg ${theme.buttonBg} hover:${theme.buttonHover} ${theme.textSecondary} transition`}
+              >
+                150%
+              </button>
+            </div>
+
+            <div className={`h-6 w-px ${theme.border}`} />
+
+            {/* Pan Lock Toggle */}
             <button
               onClick={() => setIsLocked(!isLocked)}
-              title={isLocked ? 'Unlock Canvas Drag (L)' : 'Lock Canvas Drag (L)'}
-              className={`p-2 rounded-lg transition ${
-                isLocked ? 'text-amber-400 bg-amber-950/40' : `${theme.textSecondary} hover:${theme.textPrimary} hover:${theme.buttonHover}`
+              title={isLocked ? 'Unlock Canvas Panning (L)' : 'Lock Canvas Panning (L)'}
+              className={`p-2 rounded-xl transition ${
+                isLocked ? 'text-amber-400 bg-amber-950/50 border border-amber-800/60' : `${theme.textSecondary} hover:${theme.textPrimary} hover:${theme.buttonHover}`
               }`}
             >
               {isLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
