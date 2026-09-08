@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
+  ArrowRight,
   Activity,
   Calendar,
   Filter,
@@ -1033,10 +1034,19 @@ export default function AdaptiveAnomalyEngine() {
           {/* Export Report Button */}
           <button
             onClick={handleExportReport}
-            className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm shadow-purple-600/20 hover:bg-purple-700 active:scale-95 transition"
+            className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 active:scale-95 transition shadow-xs"
           >
             <Download className="h-3.5 w-3.5" />
             <span>Export</span>
+          </button>
+
+          {/* Proceed to Chain of Custody & Reports */}
+          <button
+            onClick={() => navigate(`/custody?caseId=${selectedCaseId}`)}
+            className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm shadow-indigo-600/20 hover:bg-indigo-700 active:scale-95 transition"
+          >
+            <ShieldCheck className="h-3.5 w-3.5" />
+            <span>Chain of Custody & Reports &rarr;</span>
           </button>
         </div>
       </header>
@@ -1989,6 +1999,35 @@ export default function AdaptiveAnomalyEngine() {
               </div>
             </div>
           </div>
+        </section>
+
+        {/* Next Investigation Stage: Evidence Sealing & Chain of Custody (BSA Sec 63) */}
+        <section className="rounded-2xl border border-indigo-200 bg-gradient-to-r from-indigo-50/90 via-purple-50/70 to-white p-5 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="p-3 bg-indigo-600 text-white rounded-xl shadow-xs shrink-0">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-900">
+                  Next Investigation Stage: Evidence Sealing & Chain of Custody
+                </h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-100 text-indigo-800 border border-indigo-200">
+                  BSA Sec 63 Compliant
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 mt-0.5">
+                {alerts.length} anomaly detections verified. Generate forensic integrity certificates, seal evidence with SHA-256 checksums, and export official legal dossiers.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => navigate(`/custody?caseId=${selectedCaseId}`)}
+            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-sm flex items-center space-x-2 shrink-0 active:scale-95 transition"
+          >
+            <span>Proceed to Chain of Custody</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
         </section>
 
         {/* Real-time Telemetry Caption */}
