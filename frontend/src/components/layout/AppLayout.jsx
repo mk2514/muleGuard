@@ -11,7 +11,7 @@ export default function AppLayout() {
       {!isGraph && <Sidebar />}
       <div className="flex min-w-0 flex-1 flex-col">
         {!isGraph && <Header />}
-        <main className={`min-h-0 flex-1 ${isGraph ? "overflow-hidden p-0 bg-[#070B19]" : "overflow-y-auto p-5"}`}>
+        <main className={`min-h-0 flex-1 ${isGraph ? "h-full w-full overflow-hidden p-0 bg-[#070B19]" : "overflow-y-auto p-5"}`}>
           <Outlet />
         </main>
       </div>

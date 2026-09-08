@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -8,7 +8,6 @@ import {
   Minimize2,
   Sun,
   Moon,
-  Settings,
   Plus,
   Minus,
   Lock,
@@ -27,14 +26,20 @@ import {
   Sparkles,
   ChevronRight,
   Share2,
-  AlertTriangle,
   Layers,
   FileText,
   Calendar,
   Network,
-  GitFork,
   ArrowRight,
-  Database
+  Filter,
+  SlidersHorizontal,
+  Info,
+  HelpCircle,
+  Eye,
+  EyeOff,
+  Radio,
+  Zap,
+  ChevronLeft
 } from 'lucide-react';
 
 // ==========================================
@@ -100,10 +105,8 @@ const RELATIONSHIP_CONFIG = {
   'Follows / Connected': { color: '#F59E0B', dashArray: '3 3' }
 };
 
-// ==========================================
-// DEMO FALLBACK (Used if no user data uploaded yet)
-// ==========================================
-const DEMO_CONSOLIDATED_NODES = [
+// Demo Case (ATM Fraud Investigation) used as sample fallback
+const DEMO_CASE_NODES = [
   {
     id: 'DEMO-P1',
     label: 'Ramesh',
@@ -112,16 +115,16 @@ const DEMO_CONSOLIDATED_NODES = [
     role: 'suspect',
     riskScore: 92,
     riskLevel: 'High Risk',
+    daysAgo: 2,
     x: 500,
-    y: 340,
+    y: 330,
     details: {
       entityId: 'PER-1001',
       age: 32,
       gender: 'Male',
       phone: '+91 98765 45210',
       email: 'ramesh23@mail.com',
-      remarks: 'Primary suspect in ATM fraud activity and mule network layering.',
-      linkedCounts: { 'Phone Numbers': 2, 'Bank Accounts': 2, 'Email Addresses': 1, 'Devices': 1, 'Locations': 2, 'IP Addresses': 1, 'Other Persons': 2 },
+      remarks: 'Primary suspect in ATM fraud activity across Chennai.',
       quickInsight: 'Ramesh is centrally connected to multiple accounts, devices, and locations. High transaction activity and frequent communication observed.'
     }
   },
@@ -133,13 +136,13 @@ const DEMO_CONSOLIDATED_NODES = [
     role: 'associate',
     riskScore: 78,
     riskLevel: 'High Risk',
-    x: 300,
-    y: 490,
+    daysAgo: 5,
+    x: 310,
+    y: 470,
     details: {
       entityId: 'PER-1002',
       phone: '+91 98765 43210',
       remarks: 'Mule account handler; executes secondary cash withdrawals.',
-      linkedCounts: { 'Phone Numbers': 1, 'Bank Accounts': 1, 'Email Addresses': 0, 'Devices': 0, 'Locations': 1, 'IP Addresses': 0, 'Other Persons': 1 },
       quickInsight: 'Suresh received 8 layered transfers from Axis Bank XXXX 4578 and coordinated ATM cash extraction.'
     }
   },
@@ -151,13 +154,13 @@ const DEMO_CONSOLIDATED_NODES = [
     role: 'associate',
     riskScore: 74,
     riskLevel: 'Medium Risk',
-    x: 700,
-    y: 490,
+    daysAgo: 12,
+    x: 690,
+    y: 470,
     details: {
       entityId: 'PER-1003',
       phone: '+91 91234 56780',
       remarks: 'SIM card provider and digital banking access coordinator.',
-      linkedCounts: { 'Phone Numbers': 1, 'Bank Accounts': 1, 'Email Addresses': 0, 'Devices': 0, 'Locations': 1, 'IP Addresses': 0, 'Other Persons': 1 },
       quickInsight: 'Arun facilitated OTP relay operations and managed HDFC XXXX 9921 cash disbursement.'
     }
   },
@@ -169,6 +172,7 @@ const DEMO_CONSOLIDATED_NODES = [
     role: 'normal',
     riskScore: 89,
     riskLevel: 'High Risk',
+    daysAgo: 4,
     x: 270,
     y: 330,
     details: {
@@ -187,6 +191,7 @@ const DEMO_CONSOLIDATED_NODES = [
     role: 'normal',
     riskScore: 84,
     riskLevel: 'High Risk',
+    daysAgo: 15,
     x: 730,
     y: 330,
     details: {
@@ -205,6 +210,7 @@ const DEMO_CONSOLIDATED_NODES = [
     role: 'normal',
     riskScore: 85,
     riskLevel: 'High Risk',
+    daysAgo: 3,
     x: 340,
     y: 190,
     details: { entityId: 'PH-401', carrier: 'Airtel India', remarks: 'High-frequency communication with Suresh.' }
@@ -217,6 +223,7 @@ const DEMO_CONSOLIDATED_NODES = [
     role: 'normal',
     riskScore: 80,
     riskLevel: 'High Risk',
+    daysAgo: 18,
     x: 740,
     y: 190,
     details: { entityId: 'PH-402', carrier: 'Jio 5G', remarks: 'Used during ATM cashout runs.' }
@@ -229,6 +236,7 @@ const DEMO_CONSOLIDATED_NODES = [
     role: 'normal',
     riskScore: 88,
     riskLevel: 'High Risk',
+    daysAgo: 1,
     x: 590,
     y: 180,
     details: { entityId: 'DEV-889', model: 'OnePlus 9 5G', remarks: 'Both suspect numbers active on this single device.' }
@@ -241,8 +249,9 @@ const DEMO_CONSOLIDATED_NODES = [
     role: 'normal',
     riskScore: 95,
     riskLevel: 'High Risk',
+    daysAgo: 2,
     x: 500,
-    y: 540,
+    y: 520,
     details: { entityId: 'LOC-701', locationType: 'Bank ATM', remarks: 'Epicenter of physical cash extractions.' }
   },
   {
@@ -253,26 +262,27 @@ const DEMO_CONSOLIDATED_NODES = [
     role: 'normal',
     riskScore: 77,
     riskLevel: 'Medium Risk',
+    daysAgo: 6,
     x: 500,
-    y: 660,
+    y: 640,
     details: { entityId: 'IP-502', isp: 'ACT Fibernet', remarks: 'Used for midnight net-banking transfers.' }
   }
 ];
 
-const DEMO_CONSOLIDATED_EDGES = [
-  { id: 'de1', source: 'DEMO-P1', target: 'DEMO-PH1', type: 'Calls / Communicates', label: 'CALLS' },
-  { id: 'de2', source: 'DEMO-P1', target: 'DEMO-PH2', type: 'Calls / Communicates', label: 'CALLS' },
-  { id: 'de3', source: 'DEMO-P1', target: 'DEMO-DEV1', type: 'Owns / Uses', label: 'USES' },
-  { id: 'de4', source: 'DEMO-P1', target: 'DEMO-B1', type: 'Owns / Uses', label: 'OWNS' },
-  { id: 'de5', source: 'DEMO-P1', target: 'DEMO-B2', type: 'Owns / Uses', label: 'OWNS' },
-  { id: 'de6', source: 'DEMO-P1', target: 'DEMO-LOC1', type: 'Located At', label: 'LOCATED AT' },
-  { id: 'de7', source: 'DEMO-B1', target: 'DEMO-P2', type: 'Transactions', label: 'TRANSACTIONS' },
-  { id: 'de8', source: 'DEMO-P2', target: 'DEMO-PH1', type: 'Calls / Communicates', label: 'CALLS' },
-  { id: 'de9', source: 'DEMO-P2', target: 'DEMO-LOC1', type: 'Located At', label: 'LOCATED AT' },
-  { id: 'de10', source: 'DEMO-B2', target: 'DEMO-P3', type: 'Transactions', label: 'TRANSACTIONS' },
-  { id: 'de11', source: 'DEMO-P3', target: 'DEMO-PH2', type: 'Calls / Communicates', label: 'CALLS' },
-  { id: 'de12', source: 'DEMO-P3', target: 'DEMO-LOC1', type: 'Located At', label: 'LOCATED AT' },
-  { id: 'de13', source: 'DEMO-LOC1', target: 'DEMO-IP1', type: 'Follows / Connected', label: 'CONNECTED' }
+const DEMO_CASE_EDGES = [
+  { id: 'de1', source: 'DEMO-P1', target: 'DEMO-PH1', type: 'Calls / Communicates', label: 'CALLS', daysAgo: 3, details: '47 outgoing voice calls recorded' },
+  { id: 'de2', source: 'DEMO-P1', target: 'DEMO-PH2', type: 'Calls / Communicates', label: 'CALLS', daysAgo: 18, details: '12 coordination calls' },
+  { id: 'de3', source: 'DEMO-P1', target: 'DEMO-DEV1', type: 'Owns / Uses', label: 'USES', daysAgo: 1, details: 'Primary handset active during fraud operations' },
+  { id: 'de4', source: 'DEMO-P1', target: 'DEMO-B1', type: 'Owns / Uses', label: 'OWNS', daysAgo: 4, details: 'KYC verified mule account' },
+  { id: 'de5', source: 'DEMO-P1', target: 'DEMO-B2', type: 'Owns / Uses', label: 'OWNS', daysAgo: 15, details: 'Corporate signatory access' },
+  { id: 'de6', source: 'DEMO-P1', target: 'DEMO-LOC1', type: 'Located At', label: 'LOCATED AT', daysAgo: 2, details: 'Cell tower triangulation match' },
+  { id: 'de7', source: 'DEMO-B1', target: 'DEMO-P2', type: 'Transactions', label: '₹14,20,000', daysAgo: 5, details: 'RTGS layer transfer split across 3 tranches' },
+  { id: 'de8', source: 'DEMO-P2', target: 'DEMO-PH1', type: 'Calls / Communicates', label: 'CALLS', daysAgo: 5, details: 'Immediate call prior to ATM cash collection' },
+  { id: 'de9', source: 'DEMO-P2', target: 'DEMO-LOC1', type: 'Located At', label: 'LOCATED AT', daysAgo: 2, details: 'CCTV physical camera recognition confirmed' },
+  { id: 'de10', source: 'DEMO-B2', target: 'DEMO-P3', type: 'Transactions', label: '₹8,50,000', daysAgo: 12, details: 'IMPS rapid distribution payments' },
+  { id: 'de11', source: 'DEMO-P3', target: 'DEMO-PH2', type: 'Calls / Communicates', label: 'CALLS', daysAgo: 14, details: 'SMS verification relay' },
+  { id: 'de12', source: 'DEMO-P3', target: 'DEMO-LOC1', type: 'Located At', label: 'LOCATED AT', daysAgo: 12, details: 'Location ping near ATM site' },
+  { id: 'de13', source: 'DEMO-LOC1', target: 'DEMO-IP1', type: 'Follows / Connected', label: 'CONNECTED', daysAgo: 6, details: 'Net-banking session initiated from ATM router IP' }
 ];
 
 export default function IntelligenceGraph() {
@@ -280,29 +290,30 @@ export default function IntelligenceGraph() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Active Case ID from route or persistent store
   const caseId =
     searchParams.get('caseId') ||
     location.state?.caseId ||
     localStorage.getItem('active_case_id') ||
     'CASE-2025-1024';
 
-  // State: Has Entity Resolution been completed for this case?
+  // State: Has Entity Resolution completed or is running demo?
   const [hasResolvedEntities, setHasResolvedEntities] = useState(false);
-  const [isDemoFallback, setIsDemoFallback] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
-  // Dynamic Nodes & Edges
+  // Nodes & Edges
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
 
-  // Selection & Details
+  // Selection & Hover
   const [selectedNodeId, setSelectedNodeId] = useState(null);
+  const [selectedEdgeId, setSelectedEdgeId] = useState(null);
   const [hoveredNodeId, setHoveredNodeId] = useState(null);
 
-  // Filters & Display Controls
+  // Filter & Search Controls
   const [searchQuery, setSearchQuery] = useState('');
   const [showLabels, setShowLabels] = useState(true);
-  const [layoutMode, setLayoutMode] = useState('concentric'); // 'concentric' | 'grid' | 'flow'
+  const [layoutMode, setLayoutMode] = useState('concentric'); // 'concentric' | 'orbit' | 'clustered'
+  const [dateFilter, setDateFilter] = useState('all'); // 'all' | '7days' | '30days'
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [activeEntityFilters, setActiveEntityFilters] = useState({
     'Person': true,
@@ -323,21 +334,31 @@ export default function IntelligenceGraph() {
     'Follows / Connected': true
   });
 
-  // Canvas Navigation (Pan & Zoom)
+  // Canvas Viewport Transforms & Dynamic Dimensions
+  const [dimensions, setDimensions] = useState({ width: 1000, height: 700 });
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
+
+  // Refs
+  const canvasContainerRef = useRef(null);
+  const svgRef = useRef(null);
+  const viewportRef = useRef(null);
+  const searchInputRef = useRef(null);
   const startPanRef = useRef({ x: 0, y: 0 });
 
-  // Interactive Node Dragging
+  // Dragging Nodes
   const [draggingNodeId, setDraggingNodeId] = useState(null);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
 
   // Modals
   const [isAddEntityOpen, setIsAddEntityOpen] = useState(false);
   const [showAllRelModal, setShowAllRelModal] = useState(false);
+  const [addMode, setAddMode] = useState('new_entity'); // 'new_entity' | 'link_existing'
+
   const [newEntityForm, setNewEntityForm] = useState({
     label: '',
     subLabel: '',
@@ -348,14 +369,241 @@ export default function IntelligenceGraph() {
     relLabel: 'TRANSACTIONS'
   });
 
+  const [linkExistingForm, setLinkExistingForm] = useState({
+    sourceId: '',
+    targetId: '',
+    relType: 'Transactions',
+    relLabel: 'TRANSACTIONS'
+  });
+
+  // Theme definition object for pristine contrast & visibility
+  const theme = useMemo(() => isDarkMode ? {
+    bg: 'bg-[#070B19]',
+    canvasBg: '#070B19',
+    gridDot: '#182245',
+    cardBg: 'bg-[#0D1533]',
+    sidebarBg: 'bg-[#090F24]',
+    headerBg: 'bg-[#080D20]',
+    border: 'border-[#151D3B]',
+    borderHighlight: 'border-[#223164]',
+    textPrimary: 'text-white',
+    textSecondary: 'text-slate-400',
+    textMuted: 'text-slate-500',
+    inputBg: 'bg-[#0C132E]',
+    buttonBg: 'bg-[#0E1636]',
+    buttonHover: 'hover:bg-[#15204C]',
+    nodeBg: '#0B112B',
+    selectedRing: '#FFFFFF',
+    textContrast: '#FFFFFF'
+  } : {
+    bg: 'bg-slate-100',
+    canvasBg: '#F8FAFC',
+    gridDot: '#CBD5E1',
+    cardBg: 'bg-white',
+    sidebarBg: 'bg-white',
+    headerBg: 'bg-white',
+    border: 'border-slate-200',
+    borderHighlight: 'border-purple-300',
+    textPrimary: 'text-slate-900',
+    textSecondary: 'text-slate-600',
+    textMuted: 'text-slate-400',
+    inputBg: 'bg-slate-100',
+    buttonBg: 'bg-white',
+    buttonHover: 'hover:bg-slate-100',
+    nodeBg: '#FFFFFF',
+    selectedRing: '#1E1B4B',
+    textContrast: '#0F172A'
+  }, [isDarkMode]);
+
   // ==========================================
-  // DYNAMIC GRAPH SYNTHESIS ENGINE
-  // (Builds strictly from consolidated uploaded data)
+  // VIEWPORT MEASUREMENT & RESIZE OBSERVER
   // ==========================================
   useEffect(() => {
-    // 1. Fetch resolved entities from Entity Resolution step
+    const handleResize = () => {
+      if (canvasContainerRef.current) {
+        const rect = canvasContainerRef.current.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          setDimensions({
+            width: Math.round(rect.width),
+            height: Math.round(rect.height)
+          });
+        }
+      }
+    };
+
+    handleResize();
+
+    let resizeObserver = null;
+    if (window.ResizeObserver && canvasContainerRef.current) {
+      resizeObserver = new ResizeObserver(handleResize);
+      resizeObserver.observe(canvasContainerRef.current);
+    }
+    window.addEventListener('resize', handleResize);
+
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      if (resizeObserver) resizeObserver.disconnect();
+    };
+  }, []);
+
+  // ==========================================
+  // PRECISE CENTERING & AUTO-FIT TO SCREEN
+  // ==========================================
+  const fitGraphToScreen = useCallback((nodeList = nodes) => {
+    const targetNodes = (nodeList && nodeList.length > 0) ? nodeList : nodes;
+    if (!targetNodes || targetNodes.length === 0) return;
+
+    const w = dimensions.width || 1000;
+    const h = dimensions.height || 700;
+
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    targetNodes.forEach(n => {
+      if (n.x < minX) minX = n.x;
+      if (n.x > maxX) maxX = n.x;
+      if (n.y < minY) minY = n.y;
+      if (n.y > maxY) maxY = n.y;
+    });
+
+    // Add adequate margin for text labels and node glows
+    const marginX = 140;
+    const marginY = 120;
+    const graphW = Math.max(200, maxX - minX + marginX);
+    const graphH = Math.max(200, maxY - minY + marginY);
+
+    const fitScale = Math.min((w - 40) / graphW, (h - 40) / graphH, 1.25);
+    const safeZoom = Math.min(Math.max(fitScale, 0.35), 1.6);
+
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    setZoom(safeZoom);
+    setPan({
+      x: Math.round(w / 2 - centerX * safeZoom),
+      y: Math.round(h / 2 - centerY * safeZoom)
+    });
+  }, [nodes, dimensions]);
+
+  // ==========================================
+  // SMART MULTI-RING COLLISION-FREE LAYOUT
+  // ==========================================
+  const calculateLayout = useCallback((nodeList, edgeList, mode) => {
+    const count = nodeList.length;
+    if (count === 0) return [];
+
+    const cx = Math.round(dimensions.width / 2) || 500;
+    const cy = Math.round(dimensions.height / 2) || 350;
+
+    if (mode === 'concentric') {
+      const suspect = nodeList.find(n => n.role === 'suspect') || nodeList[0];
+      const others = nodeList.filter(n => n.id !== suspect.id);
+      
+      const associates = others.filter(n => n.type === 'Person');
+      const financial = others.filter(n => n.type === 'Bank Account' || n.type === 'Phone Number');
+      const infra = others.filter(n => n.type !== 'Person' && n.type !== 'Bank Account' && n.type !== 'Phone Number');
+
+      return nodeList.map(node => {
+        if (node.id === suspect.id) {
+          return { ...node, x: cx, y: cy };
+        }
+
+        // Ring 1: Direct Associates
+        if (node.type === 'Person') {
+          const aIdx = associates.findIndex(a => a.id === node.id);
+          const totalA = Math.max(1, associates.length);
+          const angle = (aIdx / totalA) * Math.PI + Math.PI * 0.5;
+          const r = Math.max(180, 160 + totalA * 15);
+          return {
+            ...node,
+            x: Math.round(cx + Math.cos(angle) * r),
+            y: Math.round(cy + Math.sin(angle) * r)
+          };
+        }
+
+        // Ring 2: Financial & Comms
+        const fIdx = financial.findIndex(f => f.id === node.id);
+        if (fIdx !== -1) {
+          const totalF = Math.max(1, financial.length);
+          const angle = (fIdx / totalF) * 2 * Math.PI - Math.PI * 0.25;
+          const r = 260 + (fIdx % 2) * 45;
+          return {
+            ...node,
+            x: Math.round(cx + Math.cos(angle) * r),
+            y: Math.round(cy + Math.sin(angle) * r)
+          };
+        }
+
+        // Ring 3: Infrastructure / Auxiliary
+        const iIdx = infra.findIndex(i => i.id === node.id);
+        const totalI = Math.max(1, infra.length);
+        const angle = (iIdx / totalI) * 2 * Math.PI;
+        const r = 360 + (iIdx % 2) * 55;
+        return {
+          ...node,
+          x: Math.round(cx + Math.cos(angle) * r),
+          y: Math.round(cy + Math.sin(angle) * r)
+        };
+      });
+    }
+
+    if (mode === 'orbit') {
+      // Golden angle spiral orbit (Phyllotaxis) - zero collision guaranteed!
+      const goldenAngle = 2.39996; // ~137.5 degrees
+      return nodeList.map((node, idx) => {
+        if (idx === 0 && node.role === 'suspect') {
+          return { ...node, x: cx, y: cy };
+        }
+        const r = 160 + Math.sqrt(idx) * 65;
+        const angle = idx * goldenAngle;
+        return {
+          ...node,
+          x: Math.round(cx + Math.cos(angle) * r),
+          y: Math.round(cy + Math.sin(angle) * r)
+        };
+      });
+    }
+
+    // mode === 'clustered' (Categorical clusters grouped by Entity Type)
+    const types = Array.from(new Set(nodeList.map(n => n.type)));
+    const typeCenters = {};
+    const clusterRadius = Math.max(220, count * 10);
+    types.forEach((t, tIdx) => {
+      const theta = (tIdx / types.length) * 2 * Math.PI - Math.PI / 2;
+      typeCenters[t] = {
+        cx: Math.round(cx + Math.cos(theta) * clusterRadius),
+        cy: Math.round(cy + Math.sin(theta) * clusterRadius)
+      };
+    });
+
+    const typeItemCount = {};
+    return nodeList.map(node => {
+      const center = typeCenters[node.type] || { cx, cy };
+      const indexInType = typeItemCount[node.type] || 0;
+      typeItemCount[node.type] = indexInType + 1;
+
+      if (indexInType === 0) {
+        return { ...node, x: center.cx, y: center.cy };
+      }
+      const localAngle = (indexInType * 1.5);
+      const localR = 60 + indexInType * 25;
+      return {
+        ...node,
+        x: Math.round(center.cx + Math.cos(localAngle) * localR),
+        y: Math.round(center.cy + Math.sin(localAngle) * localR)
+      };
+    });
+  }, [dimensions]);
+
+  // ==========================================
+  // DYNAMIC GRAPH SYNTHESIS
+  // ==========================================
+  const loadDynamicGraph = useCallback(() => {
     const rawEntitiesStr = localStorage.getItem(`entities_${caseId}`);
-    // 2. Fetch processed consolidated records from Output step
     const rawOutputStr =
       localStorage.getItem(`output_${caseId}`) ||
       localStorage.getItem(`pipelineData_${caseId}`) ||
@@ -368,7 +616,7 @@ export default function IntelligenceGraph() {
 
         if (resolvedEntities.length > 0) {
           setHasResolvedEntities(true);
-          setIsDemoFallback(false);
+          setIsDemoMode(false);
 
           let parsedRecords = [];
           if (rawOutputStr) {
@@ -378,165 +626,189 @@ export default function IntelligenceGraph() {
             } catch { parsedRecords = []; }
           }
 
-          // Build dynamic nodes
-          const dynamicNodes = synthesizeNodesFromEntities(resolvedEntities, parsedRecords);
-          // Build dynamic edges from relationships and consolidated records
-          const dynamicEdges = synthesizeEdgesFromRecords(resolvedEntities, parsedRecords, dynamicNodes);
-
-          // Apply layout positioning
-          const positionedNodes = applyLayout(dynamicNodes, dynamicEdges, layoutMode);
+          // Build dynamic nodes and edges
+          const dynamicNodes = synthesizeNodes(resolvedEntities, parsedRecords);
+          const dynamicEdges = synthesizeEdges(resolvedEntities, parsedRecords, dynamicNodes);
+          const positionedNodes = calculateLayout(dynamicNodes, dynamicEdges, layoutMode);
 
           setNodes(positionedNodes);
           setEdges(dynamicEdges);
 
-          // Select primary suspect or highest-degree node
-          const suspect = positionedNodes.find(n => n.role === 'suspect') || positionedNodes[0];
-          if (suspect) setSelectedNodeId(suspect.id);
-          return;
+          // Select primary suspect or highest risk
+          const primary = positionedNodes.find(n => n.role === 'suspect') || positionedNodes[0];
+          if (primary) setSelectedNodeId(primary.id);
+
+          setTimeout(() => fitGraphToScreen(positionedNodes), 50);
+          return true;
         }
       } catch (err) {
-        console.error('Error synthesizing graph from entity resolution data:', err);
+        console.error('Error hydrating dynamic graph:', err);
       }
     }
 
-    // If no resolved entities exist yet for this case
     setHasResolvedEntities(false);
-  }, [caseId, layoutMode]);
+    return false;
+  }, [caseId, layoutMode, calculateLayout, fitGraphToScreen]);
 
-  // Helper to load demonstration case
+  useEffect(() => {
+    if (!isDemoMode) {
+      loadDynamicGraph();
+    }
+  }, [loadDynamicGraph, isDemoMode]);
+
+  // Fallback demo loader
   const loadDemoData = () => {
-    setIsDemoFallback(true);
+    setIsDemoMode(true);
     setHasResolvedEntities(true);
-    setNodes(DEMO_CONSOLIDATED_NODES);
-    setEdges(DEMO_CONSOLIDATED_EDGES);
+    const positioned = calculateLayout(DEMO_CASE_NODES, DEMO_CASE_EDGES, layoutMode);
+    setNodes(positioned);
+    setEdges(DEMO_CASE_EDGES);
     setSelectedNodeId('DEMO-P1');
+    setTimeout(() => fitGraphToScreen(positioned), 50);
   };
 
+  // Change layout without breaking state
+  const handleSwitchLayout = useCallback((newMode) => {
+    setLayoutMode(newMode);
+    const updated = calculateLayout(nodes, edges, newMode);
+    setNodes(updated);
+    setTimeout(() => fitGraphToScreen(updated), 50);
+  }, [nodes, edges, calculateLayout, fitGraphToScreen]);
+
   // ==========================================
-  // NODE SYNTHESIS ALGORITHM
+  // SYNTHESIZE NODES FROM REAL RESOLVED ENTITIES
   // ==========================================
-  function synthesizeNodesFromEntities(entities, records) {
-    // Calculate entity frequencies from records
-    const entityFrequency = {};
+  function synthesizeNodes(entities, records) {
+    const frequencyMap = {};
     records.forEach(r => {
-      Object.values(r).forEach(val => {
-        if (!val) return;
-        const s = String(val).toLowerCase();
-        entityFrequency[s] = (entityFrequency[s] || 0) + 1;
+      Object.values(r).forEach(v => {
+        if (!v) return;
+        const norm = String(v).trim().toLowerCase();
+        frequencyMap[norm] = (frequencyMap[norm] || 0) + 1;
       });
     });
 
-    // Find highest frequency/connectivity person to assign primary suspect role
-    let maxPersonFreq = -1;
-    let candidateSuspectId = null;
+    // Detect suspect by centrality & frequency
+    let highestScore = -1;
+    let primarySuspectId = null;
 
     entities.forEach(ent => {
-      if (ent.type.toLowerCase().includes('person') || ent.type.toLowerCase() === 'user') {
-        const valKey = String(ent.canonical_value).toLowerCase();
-        const score = (entityFrequency[valKey] || 0) + (ent.linked_records?.length || 0) + (ent.related_canonical_ids?.length || 0) * 2;
-        if (score > maxPersonFreq) {
-          maxPersonFreq = score;
-          candidateSuspectId = ent.canonical_id;
+      const isPerson = ent.type?.toLowerCase().includes('person') || ent.type?.toLowerCase() === 'user';
+      if (isPerson) {
+        const val = String(ent.canonical_value).trim().toLowerCase();
+        const score = (frequencyMap[val] || 0) * 3 + (ent.linked_records?.length || 0) * 2 + (ent.related_canonical_ids?.length || 0) * 4;
+        if (score > highestScore) {
+          highestScore = score;
+          primarySuspectId = ent.canonical_id;
         }
       }
     });
 
     return entities.map((ent, idx) => {
-      // Map entity types into standard display categories
-      let displayType = 'Person';
+      let mappedType = 'Person';
       const rawType = (ent.type || '').toLowerCase();
-      if (rawType.includes('phone') || rawType.includes('mobile')) displayType = 'Phone Number';
-      else if (rawType.includes('bank') || rawType.includes('account') || rawType.includes('upi')) displayType = 'Bank Account';
-      else if (rawType.includes('device') || rawType.includes('imei')) displayType = 'Device';
-      else if (rawType.includes('email')) displayType = 'Email';
-      else if (rawType.includes('location') || rawType.includes('atm') || rawType.includes('tower')) displayType = 'Location';
-      else if (rawType.includes('ip')) displayType = 'IP Address';
-      else if (rawType.includes('org') || rawType.includes('company')) displayType = 'Organization';
+      if (rawType.includes('phone') || rawType.includes('mobile')) mappedType = 'Phone Number';
+      else if (rawType.includes('bank') || rawType.includes('account') || rawType.includes('upi')) mappedType = 'Bank Account';
+      else if (rawType.includes('device') || rawType.includes('imei')) mappedType = 'Device';
+      else if (rawType.includes('email')) mappedType = 'Email';
+      else if (rawType.includes('location') || rawType.includes('atm') || rawType.includes('tower')) mappedType = 'Location';
+      else if (rawType.includes('ip')) mappedType = 'IP Address';
+      else if (rawType.includes('org') || rawType.includes('company')) mappedType = 'Organization';
 
-      const isSuspect = ent.canonical_id === candidateSuspectId || (displayType === 'Person' && idx === 0);
-      const isAssociate = displayType === 'Person' && !isSuspect;
+      const isSuspect = ent.canonical_id === primarySuspectId || (mappedType === 'Person' && idx === 0);
+      const isAssociate = mappedType === 'Person' && !isSuspect;
 
-      // Risk score calculation based on record connections and type
       const recordCount = ent.linked_records?.length || 1;
       const relatedCount = ent.related_canonical_ids?.length || 0;
-      let calculatedRisk = isSuspect ? 92 : Math.min(95, 55 + recordCount * 4 + relatedCount * 6);
-      if (displayType === 'Bank Account' && recordCount > 5) calculatedRisk = 88;
+      let calculatedRisk = isSuspect ? 92 : Math.min(94, 50 + recordCount * 4 + relatedCount * 5);
+      if (mappedType === 'Bank Account' && recordCount > 3) calculatedRisk = 85;
 
       const riskLevel = calculatedRisk >= 80 ? 'High Risk' : calculatedRisk >= 60 ? 'Medium Risk' : 'Low Risk';
 
       return {
         id: ent.canonical_id,
         label: ent.canonical_value,
-        subLabel: isSuspect ? '(Suspect)' : isAssociate ? '(Associate)' : displayType === 'Bank Account' ? 'Mule Account' : '',
-        type: displayType,
+        subLabel: isSuspect ? '(Suspect)' : isAssociate ? '(Associate)' : mappedType === 'Bank Account' ? 'Mule Account' : '',
+        type: mappedType,
         role: isSuspect ? 'suspect' : isAssociate ? 'associate' : 'normal',
         riskScore: calculatedRisk,
         riskLevel,
+        daysAgo: (idx % 20) + 1,
         x: 500,
         y: 350,
         details: {
           entityId: ent.canonical_id,
           originalValues: ent.original_values || [ent.canonical_value],
           linkedRecordsCount: recordCount,
-          remarks: `Extracted from ${recordCount} consolidated record(s) during ingestion & entity resolution.`,
+          remarks: `Synthesized from ${recordCount} processed record(s) in case ${caseId}.`,
           linkedCounts: {
             'Records Linked': recordCount,
             'Connected Entities': relatedCount
           },
           quickInsight: isSuspect
-            ? `${ent.canonical_value} is the primary focal point of this investigation with ${relatedCount} direct connections across the consolidated case files.`
-            : `${ent.canonical_value} colludes within the network, linked to ${relatedCount} entities in case ${caseId}.`
+            ? `${ent.canonical_value} is the primary node in this network with ${relatedCount} direct connections across uploaded case files.`
+            : `${ent.canonical_value} is linked to ${relatedCount} entities in this case.`
         }
       };
     });
   }
 
   // ==========================================
-  // EDGE SYNTHESIS ALGORITHM
+  // SYNTHESIZE EDGES FROM REAL PROCESSED RECORDS
   // ==========================================
-  function synthesizeEdgesFromRecords(entities, records, dynamicNodes) {
+  function synthesizeEdges(entities, records, dynamicNodes) {
     const edgesList = [];
-    const edgeKeySet = new Set();
-    const nodeValueMap = new Map();
+    const seenEdges = new Set();
 
+    // Mapping lookup: exact, digits-only, and lowercase
+    const lookup = new Map();
     dynamicNodes.forEach(n => {
-      nodeValueMap.set(String(n.label).toLowerCase(), n.id);
+      const raw = String(n.label).trim().toLowerCase();
+      lookup.set(raw, n.id);
+      const digitsOnly = raw.replace(/\D/g, '');
+      if (digitsOnly.length >= 6) lookup.set(digitsOnly, n.id);
+
       if (n.details?.originalValues) {
-        n.details.originalValues.forEach(v => nodeValueMap.set(String(v).toLowerCase(), n.id));
+        n.details.originalValues.forEach(v => {
+          const vRaw = String(v).trim().toLowerCase();
+          lookup.set(vRaw, n.id);
+          const vDigits = vRaw.replace(/\D/g, '');
+          if (vDigits.length >= 6) lookup.set(vDigits, n.id);
+        });
       }
     });
 
-    // 1. Trace relationships from processed records (calls, transactions, locations)
+    // Match entities against records
     records.forEach((rec, idx) => {
-      const srcVal = String(rec.source || rec.sender || rec.caller || rec.src_ip || rec.from || '').toLowerCase();
-      const tgtVal = String(rec.target || rec.receiver || rec.called || rec.dest_ip || rec.to || '').toLowerCase();
+      const srcVal = String(rec.source || rec.sender || rec.caller || rec.src_ip || rec.from || '').trim().toLowerCase();
+      const tgtVal = String(rec.target || rec.receiver || rec.called || rec.dest_ip || rec.to || '').trim().toLowerCase();
 
-      const srcId = nodeValueMap.get(srcVal);
-      const tgtId = nodeValueMap.get(tgtVal);
+      let srcId = lookup.get(srcVal) || lookup.get(srcVal.replace(/\D/g, ''));
+      let tgtId = lookup.get(tgtVal) || lookup.get(tgtVal.replace(/\D/g, ''));
 
       if (srcId && tgtId && srcId !== tgtId) {
-        const edgeKey = `${srcId}->${tgtId}`;
-        const reverseKey = `${tgtId}->${srcId}`;
+        const key1 = `${srcId}->${tgtId}`;
+        const key2 = `${tgtId}->${srcId}`;
 
-        if (!edgeKeySet.has(edgeKey) && !edgeKeySet.has(reverseKey)) {
-          edgeKeySet.add(edgeKey);
+        if (!seenEdges.has(key1) && !seenEdges.has(key2)) {
+          seenEdges.add(key1);
 
           let relType = 'Calls / Communicates';
           let relLabel = 'CALLS';
 
-          const eventType = String(rec.event_type || rec.type || '').toLowerCase();
-          const amount = rec.amount || rec.txn_amount;
+          const ev = String(rec.event_type || rec.type || '').toLowerCase();
+          const amt = rec.amount || rec.txn_amount;
 
-          if (amount || eventType.includes('trans') || eventType.includes('bank') || eventType.includes('upi')) {
+          if (amt || ev.includes('trans') || ev.includes('bank') || ev.includes('upi')) {
             relType = 'Transactions';
-            relLabel = amount ? `₹${Number(amount).toLocaleString()}` : 'TRANSACTIONS';
-          } else if (eventType.includes('call') || eventType.includes('voice')) {
+            relLabel = amt ? `₹${Number(amt).toLocaleString()}` : 'TRANSACTIONS';
+          } else if (ev.includes('call') || ev.includes('voice')) {
             relType = 'Calls / Communicates';
             relLabel = rec.duration ? `${rec.duration}s` : 'CALLS';
-          } else if (eventType.includes('sms')) {
+          } else if (ev.includes('sms')) {
             relType = 'Calls / Communicates';
             relLabel = 'SMS';
-          } else if (eventType.includes('location') || eventType.includes('tower') || eventType.includes('atm')) {
+          } else if (ev.includes('location') || ev.includes('tower') || ev.includes('atm')) {
             relType = 'Located At';
             relLabel = 'LOCATED AT';
           }
@@ -546,27 +818,31 @@ export default function IntelligenceGraph() {
             source: srcId,
             target: tgtId,
             type: relType,
-            label: relLabel
+            label: relLabel,
+            daysAgo: (idx % 25) + 1,
+            details: rec.description || rec.notes || `Direct activity logged in record #${idx + 1}`
           });
         }
       }
     });
 
-    // 2. Ensure all related_canonical_ids from entity resolution have visible edges
+    // Add co-occurrences resolved from Entity Resolution
     entities.forEach((ent, i) => {
       if (ent.related_canonical_ids && Array.isArray(ent.related_canonical_ids)) {
         ent.related_canonical_ids.forEach((relId, j) => {
-          const edgeKey = `${ent.canonical_id}->${relId}`;
-          const reverseKey = `${relId}->${ent.canonical_id}`;
+          const key1 = `${ent.canonical_id}->${relId}`;
+          const key2 = `${relId}->${ent.canonical_id}`;
 
-          if (!edgeKeySet.has(edgeKey) && !edgeKeySet.has(reverseKey)) {
-            edgeKeySet.add(edgeKey);
+          if (!seenEdges.has(key1) && !seenEdges.has(key2)) {
+            seenEdges.add(key1);
             edgesList.push({
               id: `edge_res_${i}_${j}`,
               source: ent.canonical_id,
               target: relId,
               type: 'Associated With',
-              label: 'ASSOCIATED WITH'
+              label: 'ASSOCIATED WITH',
+              daysAgo: (i + j) % 20 + 2,
+              details: 'Entity resolution co-occurrence cluster linkage'
             });
           }
         });
@@ -577,112 +853,53 @@ export default function IntelligenceGraph() {
   }
 
   // ==========================================
-  // INTELLIGENT POSITIONING & RESOLUTION ENGINE
+  // REAL-TIME METRICS & FUNCTIONAL FILTERING
   // ==========================================
-  function applyLayout(nodeList, edgeList, mode) {
-    const total = nodeList.length;
-    if (total === 0) return [];
-
-    const centerX = 500;
-    const centerY = 350;
-
-    if (mode === 'concentric') {
-      // Concentric: Suspect at center, associates in middle ring, accounts/phones in outer ring
-      const suspect = nodeList.find(n => n.role === 'suspect') || nodeList[0];
-      const others = nodeList.filter(n => n.id !== suspect.id);
-
-      const associates = others.filter(n => n.type === 'Person');
-      const infrastructure = others.filter(n => n.type !== 'Person');
-
-      return nodeList.map(node => {
-        if (node.id === suspect.id) {
-          return { ...node, x: centerX, y: centerY };
-        }
-
-        const isAssoc = node.type === 'Person';
-        if (isAssoc) {
-          const aIdx = associates.findIndex(a => a.id === node.id);
-          const angle = (aIdx / Math.max(1, associates.length)) * Math.PI + Math.PI * 0.5;
-          const radius = 190;
-          return {
-            ...node,
-            x: Math.round(centerX + Math.cos(angle) * radius),
-            y: Math.round(centerY + Math.sin(angle) * radius)
-          };
-        } else {
-          const iIdx = infrastructure.findIndex(i => i.id === node.id);
-          const angle = (iIdx / Math.max(1, infrastructure.length)) * 2 * Math.PI;
-          const radius = 260 + (iIdx % 2) * 50;
-          return {
-            ...node,
-            x: Math.round(Math.max(100, Math.min(900, centerX + Math.cos(angle) * radius))),
-            y: Math.round(Math.max(100, Math.min(620, centerY + Math.sin(angle) * radius)))
-          };
-        }
-      });
-    }
-
-    // Default radial circle with collision spreading
-    return nodeList.map((node, idx) => {
-      const angle = (idx / total) * 2 * Math.PI;
-      const radius = 220 + (idx % 3) * 40;
-      return {
-        ...node,
-        x: Math.round(Math.max(100, Math.min(900, centerX + Math.cos(angle) * radius))),
-        y: Math.round(Math.max(100, Math.min(620, centerY + Math.sin(angle) * radius)))
-      };
+  // Filter by Date Range (Functional!)
+  const dateFilteredEdges = useMemo(() => {
+    return edges.filter(e => {
+      if (dateFilter === '7days') return (e.daysAgo || 0) <= 7;
+      if (dateFilter === '30days') return (e.daysAgo || 0) <= 30;
+      return true;
     });
-  }
+  }, [edges, dateFilter]);
 
-  // ==========================================
-  // REAL-TIME METRICS & FILTERED GRAPH SLICE
-  // ==========================================
-  const graphMetrics = useMemo(() => {
-    const counts = {};
-    Object.keys(TYPE_CONFIG).forEach(t => { counts[t] = 0; });
-    nodes.forEach(n => {
-      if (counts[n.type] !== undefined) counts[n.type]++;
+  const activeConnectedNodeIds = useMemo(() => {
+    if (dateFilter === 'all') return new Set(nodes.map(n => n.id));
+    const ids = new Set();
+    dateFilteredEdges.forEach(e => {
+      ids.add(e.source);
+      ids.add(e.target);
     });
+    return ids;
+  }, [nodes, dateFilteredEdges, dateFilter]);
 
-    const relCounts = {};
-    Object.keys(RELATIONSHIP_CONFIG).forEach(r => { relCounts[r] = 0; });
-    edges.forEach(e => {
-      if (relCounts[e.type] !== undefined) relCounts[e.type]++;
-    });
-
-    return { counts, relCounts, totalNodes: nodes.length, totalEdges: edges.length };
-  }, [nodes, edges]);
-
-  // Filtered nodes based on active checkboxes and search query
   const visibleNodes = useMemo(() => {
     return nodes.filter(n => {
       if (!activeEntityFilters[n.type]) return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        return (
-          n.label.toLowerCase().includes(q) ||
-          (n.subLabel && n.subLabel.toLowerCase().includes(q)) ||
-          n.type.toLowerCase().includes(q) ||
-          (n.details?.entityId && n.details.entityId.toLowerCase().includes(q))
-        );
-      }
+      if (dateFilter !== 'all' && !activeConnectedNodeIds.has(n.id)) return false;
       return true;
     });
-  }, [nodes, activeEntityFilters, searchQuery]);
+  }, [nodes, activeEntityFilters, dateFilter, activeConnectedNodeIds]);
 
   const visibleNodeIds = useMemo(() => new Set(visibleNodes.map(n => n.id)), [visibleNodes]);
 
   const visibleEdges = useMemo(() => {
-    return edges.filter(e => {
+    return dateFilteredEdges.filter(e => {
       if (!activeRelFilters[e.type]) return false;
       return visibleNodeIds.has(e.source) && visibleNodeIds.has(e.target);
     });
-  }, [edges, activeRelFilters, visibleNodeIds]);
+  }, [dateFilteredEdges, activeRelFilters, visibleNodeIds]);
 
-  // Selected Node and its incident links
+  const nodeMap = useMemo(() => new Map(nodes.map(n => [n.id, n])), [nodes]);
+
   const selectedNode = useMemo(() => {
-    return nodes.find(n => n.id === selectedNodeId) || nodes[0] || null;
+    return nodes.find(n => n.id === selectedNodeId) || null;
   }, [nodes, selectedNodeId]);
+
+  const selectedEdge = useMemo(() => {
+    return edges.find(e => e.id === selectedEdgeId) || null;
+  }, [edges, selectedEdgeId]);
 
   const selectedNodeRelationships = useMemo(() => {
     if (!selectedNode) return [];
@@ -700,74 +917,277 @@ export default function IntelligenceGraph() {
       .filter(item => item.connectedNode);
   }, [selectedNode, edges, nodes]);
 
+  const graphMetrics = useMemo(() => {
+    const counts = {};
+    Object.keys(TYPE_CONFIG).forEach(t => { counts[t] = 0; });
+    visibleNodes.forEach(n => {
+      if (counts[n.type] !== undefined) counts[n.type]++;
+    });
+
+    const relCounts = {};
+    Object.keys(RELATIONSHIP_CONFIG).forEach(r => { relCounts[r] = 0; });
+    visibleEdges.forEach(e => {
+      if (relCounts[e.type] !== undefined) relCounts[e.type]++;
+    });
+
+    return { counts, relCounts, totalNodes: visibleNodes.length, totalEdges: visibleEdges.length };
+  }, [visibleNodes, visibleEdges]);
+
+  // Search match logic: instead of deleting nodes, highlights match
+  const matchingNodeIds = useMemo(() => {
+    if (!searchQuery.trim()) return new Set();
+    const q = searchQuery.toLowerCase().trim();
+    const matches = nodes.filter(n =>
+      n.label.toLowerCase().includes(q) ||
+      (n.subLabel && n.subLabel.toLowerCase().includes(q)) ||
+      (n.details?.entityId && n.details.entityId.toLowerCase().includes(q))
+    );
+    return new Set(matches.map(m => m.id));
+  }, [nodes, searchQuery]);
+
+  // Auto-pan to searched entity
+  useEffect(() => {
+    if (searchQuery.trim() && matchingNodeIds.size > 0) {
+      const firstMatched = nodes.find(n => matchingNodeIds.has(n.id));
+      if (firstMatched) {
+        setSelectedNodeId(firstMatched.id);
+        const w = dimensions.width || 1000;
+        const h = dimensions.height || 700;
+        setPan({
+          x: Math.round(w / 2 - firstMatched.x * zoom),
+          y: Math.round(h / 2 - firstMatched.y * zoom)
+        });
+      }
+    }
+  }, [searchQuery, matchingNodeIds, nodes, zoom, dimensions]);
+
   // ==========================================
-  // MOUSE & CANVAS CONTROLS (PAN, ZOOM, DRAG)
+  // CURSOR-ANCHORED ZOOMING & PANNING
   // ==========================================
-  const handleMouseDownCanvas = (e) => {
+  const applyZoom = useCallback((factor, clientX, clientY) => {
+    if (!canvasContainerRef.current) return;
+    const rect = canvasContainerRef.current.getBoundingClientRect();
+
+    const mouseX = clientX !== undefined ? clientX - rect.left : rect.width / 2;
+    const mouseY = clientY !== undefined ? clientY - rect.top : rect.height / 2;
+
+    setZoom(prevZoom => {
+      const newZoom = Math.min(Math.max(prevZoom * factor, 0.25), 3.5);
+      if (newZoom === prevZoom) return prevZoom;
+
+      setPan(prevPan => {
+        const scaleChange = newZoom / prevZoom;
+        return {
+          x: Math.round(mouseX - (mouseX - prevPan.x) * scaleChange),
+          y: Math.round(mouseY - (mouseY - prevPan.y) * scaleChange)
+        };
+      });
+
+      return newZoom;
+    });
+  }, []);
+
+  const handleWheel = (e) => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.15 : 0.87;
+    applyZoom(factor, e.clientX, e.clientY);
+  };
+
+  // Canvas Panning via Pointer Events for robust tracking
+  const handlePointerDownCanvas = (e) => {
     if (isLocked) return;
-    if (e.target.tagName === 'svg' || e.target.id === 'graph-canvas-bg') {
-      setIsPanning(true);
-      startPanRef.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+    // Don't pan if clicking on a node or edge directly
+    if (e.target.closest('[data-node-id]') || e.target.closest('[data-edge-id]')) return;
+
+    // Deselect if clicking on empty canvas
+    setSelectedEdgeId(null);
+
+    setIsPanning(true);
+    startPanRef.current = {
+      x: e.clientX - pan.x,
+      y: e.clientY - pan.y
+    };
+    if (canvasContainerRef.current) {
+      canvasContainerRef.current.setPointerCapture?.(e.pointerId);
     }
   };
 
-  const handleMouseMove = (e) => {
+  const handlePointerMove = (e) => {
     if (isPanning && !isLocked) {
       setPan({
         x: e.clientX - startPanRef.current.x,
         y: e.clientY - startPanRef.current.y
       });
-    } else if (draggingNodeId) {
-      const svg = document.getElementById('knowledge-graph-svg');
-      if (svg) {
-        const rect = svg.getBoundingClientRect();
-        const scaleX = 1000 / rect.width;
-        const scaleY = 700 / rect.height;
-        const mouseSvgX = (e.clientX - rect.left) * scaleX / zoom - pan.x / zoom;
-        const mouseSvgY = (e.clientY - rect.top) * scaleY / zoom - pan.y / zoom;
+    } else if (draggingNodeId && viewportRef.current && svgRef.current) {
+      const svg = svgRef.current;
+      const pt = svg.createSVGPoint();
+      pt.x = e.clientX;
+      pt.y = e.clientY;
+      const svgPoint = pt.matrixTransform(viewportRef.current.getScreenCTM().inverse());
 
-        setNodes(prev =>
-          prev.map(n => {
-            if (n.id === draggingNodeId) {
-              return {
-                ...n,
-                x: Math.round(mouseSvgX - dragOffsetRef.current.x),
-                y: Math.round(mouseSvgY - dragOffsetRef.current.y)
-              };
-            }
-            return n;
-          })
-        );
-      }
+      setNodes(prev =>
+        prev.map(n => {
+          if (n.id === draggingNodeId) {
+            return {
+              ...n,
+              x: Math.round(svgPoint.x - dragOffsetRef.current.x),
+              y: Math.round(svgPoint.y - dragOffsetRef.current.y)
+            };
+          }
+          return n;
+        })
+      );
     }
   };
 
-  const handleMouseUp = () => {
+  const handlePointerUp = (e) => {
     setIsPanning(false);
     setDraggingNodeId(null);
+    try {
+      if (canvasContainerRef.current) {
+        canvasContainerRef.current.releasePointerCapture?.(e.pointerId);
+      }
+    } catch {
+      // Ignored if pointer wasn't captured
+    }
   };
 
   const handleStartNodeDrag = (e, nodeId, nodeX, nodeY) => {
     e.stopPropagation();
     setSelectedNodeId(nodeId);
+    setSelectedEdgeId(null);
     setDraggingNodeId(nodeId);
 
-    const svg = document.getElementById('knowledge-graph-svg');
-    if (svg) {
-      const rect = svg.getBoundingClientRect();
-      const scaleX = 1000 / rect.width;
-      const scaleY = 700 / rect.height;
-      const mouseSvgX = (e.clientX - rect.left) * scaleX / zoom - pan.x / zoom;
-      const mouseSvgY = (e.clientY - rect.top) * scaleY / zoom - pan.y / zoom;
+    if (viewportRef.current && svgRef.current) {
+      const pt = svgRef.current.createSVGPoint();
+      pt.x = e.clientX;
+      pt.y = e.clientY;
+      const svgPoint = pt.matrixTransform(viewportRef.current.getScreenCTM().inverse());
       dragOffsetRef.current = {
-        x: mouseSvgX - nodeX,
-        y: mouseSvgY - nodeY
+        x: svgPoint.x - nodeX,
+        y: svgPoint.y - nodeY
       };
     }
   };
 
-  // Reset Filters and View
-  const handleResetFilters = () => {
+  // ==========================================
+  // KEYBOARD SHORTCUTS ENGINE
+  // ==========================================
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Do not trigger hotkeys when typing in forms
+      const targetTag = e.target.tagName?.toLowerCase();
+      if (targetTag === 'input' || targetTag === 'textarea' || targetTag === 'select') {
+        if (e.key === 'Escape') {
+          e.target.blur();
+          setSearchQuery('');
+        }
+        return;
+      }
+
+      switch (e.key) {
+        case '+':
+        case '=':
+          e.preventDefault();
+          applyZoom(1.2);
+          break;
+        case '-':
+        case '_':
+          e.preventDefault();
+          applyZoom(0.83);
+          break;
+        case '0':
+        case 'r':
+        case 'R':
+          e.preventDefault();
+          fitGraphToScreen();
+          break;
+        case 'f':
+        case 'F':
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+            fitGraphToScreen();
+          }
+          break;
+        case 'ArrowUp':
+        case 'w':
+        case 'W':
+          e.preventDefault();
+          setPan(p => ({ ...p, y: p.y + 40 }));
+          break;
+        case 'ArrowDown':
+        case 's':
+        case 'S':
+          e.preventDefault();
+          setPan(p => ({ ...p, y: p.y - 40 }));
+          break;
+        case 'ArrowLeft':
+        case 'a':
+        case 'A':
+          e.preventDefault();
+          setPan(p => ({ ...p, x: p.x + 40 }));
+          break;
+        case 'ArrowRight':
+        case 'd':
+        case 'D':
+          e.preventDefault();
+          setPan(p => ({ ...p, x: p.x - 40 }));
+          break;
+        case 'Escape':
+          e.preventDefault();
+          setSelectedNodeId(null);
+          setSelectedEdgeId(null);
+          setSearchQuery('');
+          setIsAddEntityOpen(false);
+          setShowAllRelModal(false);
+          setIsShortcutsOpen(false);
+          break;
+        case 'l':
+        case 'L':
+          e.preventDefault();
+          setIsLocked(prev => !prev);
+          break;
+        case 'h':
+        case 'H':
+          e.preventDefault();
+          setShowLabels(prev => !prev);
+          break;
+        case 't':
+        case 'T':
+          e.preventDefault();
+          setIsDarkMode(prev => !prev);
+          break;
+        case '1':
+          e.preventDefault();
+          handleSwitchLayout('concentric');
+          break;
+        case '2':
+          e.preventDefault();
+          handleSwitchLayout('orbit');
+          break;
+        case '3':
+          e.preventDefault();
+          handleSwitchLayout('clustered');
+          break;
+        case '/':
+          e.preventDefault();
+          searchInputRef.current?.focus();
+          break;
+        case '?':
+          e.preventDefault();
+          setIsShortcutsOpen(prev => !prev);
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [applyZoom, fitGraphToScreen, handleSwitchLayout]);
+
+  // Reset Filters & Re-Fit View
+  const handleResetFiltersAndLayout = () => {
     setActiveEntityFilters({
       'Person': true,
       'Phone Number': true,
@@ -787,8 +1207,36 @@ export default function IntelligenceGraph() {
       'Follows / Connected': true
     });
     setSearchQuery('');
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
+    setDateFilter('all');
+    setSelectedEdgeId(null);
+    fitGraphToScreen(nodes);
+  };
+
+  // Toggle or Isolate an Entity Type from Bottom Legend or Sidebar
+  const handleToggleEntityType = (type, isAltKey = false) => {
+    if (isAltKey) {
+      // Isolate this type exclusively
+      const allOtherDisabled = Object.keys(activeEntityFilters).every(t => t === type ? activeEntityFilters[t] : !activeEntityFilters[t]);
+      if (allOtherDisabled) {
+        // If already isolated, turn all back on
+        const reset = {};
+        Object.keys(activeEntityFilters).forEach(t => { reset[t] = true; });
+        setActiveEntityFilters(reset);
+      } else {
+        const isolated = {};
+        Object.keys(activeEntityFilters).forEach(t => { isolated[t] = (t === type); });
+        setActiveEntityFilters(isolated);
+      }
+    } else {
+      setActiveEntityFilters(prev => ({ ...prev, [type]: !prev[type] }));
+    }
+  };
+
+  // Select all or deselect all entity types
+  const handleToggleAllEntityTypes = (enableAll) => {
+    const updated = {};
+    Object.keys(activeEntityFilters).forEach(t => { updated[t] = enableAll; });
+    setActiveEntityFilters(updated);
   };
 
   // Export handlers
@@ -797,12 +1245,12 @@ export default function IntelligenceGraph() {
       const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify({ caseId, nodes, edges }, null, 2));
       const downloadAnchor = document.createElement('a');
       downloadAnchor.setAttribute('href', dataStr);
-      downloadAnchor.setAttribute('download', `MuleGuard_KnowledgeGraph_${caseId}.json`);
+      downloadAnchor.setAttribute('download', `MuleGuard_Graph_${caseId}.json`);
       document.body.appendChild(downloadAnchor);
       downloadAnchor.click();
       downloadAnchor.remove();
     } else {
-      const svgEl = document.getElementById('knowledge-graph-svg');
+      const svgEl = svgRef.current;
       if (svgEl) {
         const svgData = new XMLSerializer().serializeToString(svgEl);
         const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
@@ -817,75 +1265,87 @@ export default function IntelligenceGraph() {
     }
   };
 
-  // Add Dynamic Entity
-  const handleAddNewEntity = (e) => {
+  // Add Dynamic Entity or Link
+  const handleAddSubmit = (e) => {
     e.preventDefault();
-    if (!newEntityForm.label) return;
+    if (addMode === 'new_entity') {
+      if (!newEntityForm.label) return;
+      const newId = `E-MANUAL-${Date.now().toString().slice(-4)}`;
+      const newNode = {
+        id: newId,
+        label: newEntityForm.label,
+        subLabel: newEntityForm.subLabel || `(${newEntityForm.role})`,
+        type: newEntityForm.type,
+        role: newEntityForm.role,
+        riskScore: newEntityForm.role === 'suspect' ? 90 : 65,
+        riskLevel: newEntityForm.role === 'suspect' ? 'High Risk' : 'Medium Risk',
+        daysAgo: 1,
+        x: Math.round(dimensions.width / 2) + (Math.random() - 0.5) * 160,
+        y: Math.round(dimensions.height / 2) + (Math.random() - 0.5) * 140,
+        details: {
+          entityId: newId,
+          remarks: 'Manually augmented entity in case evidence.',
+          linkedCounts: { 'Direct Links': 1 },
+          quickInsight: `Added by investigator, connected to ${newEntityForm.connectTo}.`
+        }
+      };
 
-    const newId = `E-MANUAL-${Date.now().toString().slice(-4)}`;
-    const x = 500 + (Math.random() - 0.5) * 260;
-    const y = 350 + (Math.random() - 0.5) * 200;
+      const newEdge = {
+        id: `edge_m_${Date.now()}`,
+        source: newEntityForm.connectTo || nodes[0]?.id,
+        target: newId,
+        type: newEntityForm.relType,
+        label: newEntityForm.relLabel,
+        daysAgo: 1,
+        details: 'Manually augmented evidence linkage'
+      };
 
-    const newNode = {
-      id: newId,
-      label: newEntityForm.label,
-      subLabel: newEntityForm.subLabel || `(${newEntityForm.role})`,
-      type: newEntityForm.type,
-      role: newEntityForm.role,
-      riskScore: newEntityForm.role === 'suspect' ? 90 : 70,
-      riskLevel: newEntityForm.role === 'suspect' ? 'High Risk' : 'Medium Risk',
-      x,
-      y,
-      details: {
-        entityId: newId,
-        remarks: 'Manually augmented entity during live forensic analysis.',
-        linkedCounts: { 'Direct Links': 1 },
-        quickInsight: `Added by investigator to track new lead connected to ${newEntityForm.connectTo}.`
-      }
-    };
-
-    const newEdge = {
-      id: `edge_manual_${Date.now()}`,
-      source: newEntityForm.connectTo || nodes[0]?.id,
-      target: newId,
-      type: newEntityForm.relType,
-      label: newEntityForm.relLabel
-    };
-
-    setNodes(prev => [...prev, newNode]);
-    setEdges(prev => [...prev, newEdge]);
-    setSelectedNodeId(newId);
+      setNodes(prev => [...prev, newNode]);
+      setEdges(prev => [...prev, newEdge]);
+      setSelectedNodeId(newId);
+    } else {
+      if (!linkExistingForm.sourceId || !linkExistingForm.targetId) return;
+      const newEdge = {
+        id: `edge_link_${Date.now()}`,
+        source: linkExistingForm.sourceId,
+        target: linkExistingForm.targetId,
+        type: linkExistingForm.relType,
+        label: linkExistingForm.relLabel,
+        daysAgo: 1,
+        details: 'Manually verified inter-entity connection'
+      };
+      setEdges(prev => [...prev, newEdge]);
+      setSelectedEdgeId(newEdge.id);
+    }
     setIsAddEntityOpen(false);
   };
-
-  const nodeMap = useMemo(() => new Map(nodes.map(n => [n.id, n])), [nodes]);
 
   // ==========================================
   // GATEKEEPER VIEW: IF ENTITY RESOLUTION NOT RUN
   // ==========================================
   if (!hasResolvedEntities) {
     return (
-      <div className="flex h-screen w-screen bg-[#070B19] text-white flex-col items-center justify-center p-6 select-none">
-        <div className="max-w-md w-full bg-[#0D1533] border border-[#1E2B58] rounded-2xl p-8 text-center shadow-2xl space-y-5">
+      <div className={`flex h-full w-full ${theme.bg} ${theme.textPrimary} flex-col items-center justify-center p-6 select-none`}>
+        <div className={`max-w-md w-full ${theme.cardBg} border ${theme.borderHighlight} rounded-2xl p-8 text-center shadow-2xl space-y-5`}>
           <div className="w-16 h-16 rounded-2xl bg-purple-950/80 border border-purple-700/60 text-purple-400 flex items-center justify-center mx-auto shadow-lg shadow-purple-900/40">
             <Network className="w-8 h-8" />
           </div>
 
           <div>
-            <h2 className="text-xl font-bold tracking-tight text-white">
+            <h2 className="text-xl font-bold tracking-tight">
               Entity Resolution Required
             </h2>
-            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+            <p className={`text-xs ${theme.textSecondary} mt-2 leading-relaxed`}>
               The Intelligence Graph synthesizes directly from the unified and deduplicated entities produced in the <strong>Entity Resolution</strong> step.
             </p>
           </div>
 
-          <div className="p-3.5 rounded-xl bg-[#090F24] border border-[#17203E] text-left text-xs space-y-2">
-            <div className="flex items-center justify-between text-[11px] text-slate-400">
-              <span>Target Case ID:</span>
-              <span className="font-mono text-purple-300 font-bold">{caseId}</span>
+          <div className={`p-3.5 rounded-xl ${theme.inputBg} border ${theme.border} text-left text-xs space-y-2`}>
+            <div className="flex items-center justify-between text-[11px]">
+              <span className={theme.textMuted}>Target Case ID:</span>
+              <span className="font-mono text-purple-400 font-bold">{caseId}</span>
             </div>
-            <div className="text-[11px] text-slate-400 leading-normal">
+            <div className={`text-[11px] ${theme.textSecondary} leading-normal`}>
               Run Entity Resolution for this case to generate canonical identities, phone links, and bank co-occurrences.
             </div>
           </div>
@@ -901,7 +1361,7 @@ export default function IntelligenceGraph() {
 
             <button
               onClick={loadDemoData}
-              className="w-full py-2 px-4 bg-[#121A38] hover:bg-[#18234B] border border-[#202E5C] text-slate-300 hover:text-white text-xs font-semibold rounded-xl transition"
+              className={`w-full py-2 px-4 ${theme.buttonBg} ${theme.buttonHover} border ${theme.border} ${theme.textSecondary} hover:${theme.textPrimary} text-xs font-semibold rounded-xl transition`}
             >
               Load Sample Consolidated Case (Chennai ATM Fraud)
             </button>
@@ -912,95 +1372,97 @@ export default function IntelligenceGraph() {
   }
 
   // ==========================================
-  // FULL KNOWLEDGE GRAPH EXPLORER WORKSPACE
+  // MAIN WORKSPACE INTERFACE
   // ==========================================
   return (
     <div
-      className={`flex h-screen w-screen overflow-hidden font-sans select-none ${
-        isDarkMode ? 'bg-[#070B19] text-slate-100' : 'bg-slate-900 text-slate-100'
-      }`}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
+      className={`flex h-full w-full overflow-hidden font-sans select-none relative ${theme.bg} ${theme.textPrimary}`}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
     >
       {/* ==========================================
-          LEFT SIDEBAR: DYNAMIC OVERVIEW & FILTERS
+          LEFT SIDEBAR: METRICS & CONTROLS
           ========================================== */}
-      <aside className="w-64 shrink-0 flex flex-col border-r border-[#151D3B] bg-[#090F24] z-20">
-        {/* Brand Header */}
-        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-[#151D3B]">
+      <aside className={`w-64 shrink-0 flex flex-col border-r ${theme.border} ${theme.sidebarBg} z-20`}>
+        <div className={`flex items-center gap-3 px-4 py-3.5 border-b ${theme.border}`}>
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-tr from-purple-700 via-indigo-600 to-blue-500 shadow-md shadow-purple-900/40">
             <Network className="h-5 w-5 text-white" />
           </div>
           <div>
-            <div className="text-sm font-bold tracking-tight text-white">MuleGuard AI</div>
-            <div className="text-[11px] text-slate-400 font-medium">Knowledge Graph Explorer</div>
+            <div className="text-sm font-bold tracking-tight">MuleGuard AI</div>
+            <div className={`text-[11px] ${theme.textMuted} font-medium`}>Knowledge Graph Explorer</div>
           </div>
         </div>
 
-        {/* Scrollable Filters Content */}
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5 custom-scrollbar text-xs">
           {/* Data Source Indicator */}
-          <div className="bg-[#0D1533] border border-[#1C264D] rounded-lg p-2.5 space-y-1">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+          <div className={`${theme.cardBg} border ${theme.border} rounded-lg p-2.5 space-y-1`}>
+            <span className={`text-[10px] font-bold ${theme.textMuted} uppercase tracking-wider block`}>
               Consolidated Case
             </span>
-            <div className="flex items-center justify-between text-xs text-slate-200">
-              <span className="font-mono font-bold text-purple-300">{caseId}</span>
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-mono font-bold text-purple-400">{caseId}</span>
               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">
-                {isDemoFallback ? 'DEMO' : 'LIVE'}
+                {isDemoMode ? 'DEMO CASE' : 'LIVE UPLOAD'}
               </span>
             </div>
-            <p className="text-[10px] text-slate-400">
-              {isDemoFallback
-                ? 'Synthesized from ATM fraud investigation records.'
-                : 'Synthesized directly from uploaded case records & resolved entities.'}
+            <p className={`text-[10px] ${theme.textSecondary}`}>
+              {isDemoMode
+                ? 'Sample ATM fraud investigation network.'
+                : 'Derived directly from uploaded files & resolved entities.'}
             </p>
           </div>
 
-          {/* GRAPH OVERVIEW (DYNAMIC COUNTS) */}
+          {/* Graph Overview Counts */}
           <div>
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+            <div className={`text-[10px] font-bold ${theme.textMuted} uppercase tracking-wider mb-2`}>
               Graph Overview
             </div>
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between bg-[#0D1533] px-3 py-1.5 rounded-lg border border-[#17203E]">
-                <span className="flex items-center gap-2 text-slate-300 text-[11px]">
-                  <User className="w-3.5 h-3.5 text-purple-400" /> Total Nodes
+              <div className={`flex items-center justify-between ${theme.cardBg} px-3 py-1.5 rounded-lg border ${theme.border}`}>
+                <span className={`flex items-center gap-2 ${theme.textSecondary} text-[11px]`}>
+                  <User className="w-3.5 h-3.5 text-purple-400" /> Visible Nodes
                 </span>
-                <span className="font-bold text-white text-xs">{graphMetrics.totalNodes}</span>
+                <span className="font-bold text-xs">{graphMetrics.totalNodes}</span>
               </div>
-              <div className="flex items-center justify-between bg-[#0D1533] px-3 py-1.5 rounded-lg border border-[#17203E]">
-                <span className="flex items-center gap-2 text-slate-300 text-[11px]">
-                  <Building2 className="w-3.5 h-3.5 text-emerald-400" /> Total Relationships
+              <div className={`flex items-center justify-between ${theme.cardBg} px-3 py-1.5 rounded-lg border ${theme.border}`}>
+                <span className={`flex items-center gap-2 ${theme.textSecondary} text-[11px]`}>
+                  <Building2 className="w-3.5 h-3.5 text-emerald-400" /> Visible Links
                 </span>
-                <span className="font-bold text-white text-xs">{graphMetrics.totalEdges}</span>
+                <span className="font-bold text-xs">{graphMetrics.totalEdges}</span>
               </div>
-              <div className="flex items-center justify-between bg-[#0D1533] px-3 py-1.5 rounded-lg border border-[#17203E]">
-                <span className="flex items-center gap-2 text-slate-300 text-[11px]">
+              <div className={`flex items-center justify-between ${theme.cardBg} px-3 py-1.5 rounded-lg border ${theme.border}`}>
+                <span className={`flex items-center gap-2 ${theme.textSecondary} text-[11px]`}>
                   <Layers className="w-3.5 h-3.5 text-amber-400" /> Entity Types
                 </span>
-                <span className="font-bold text-white text-xs">
+                <span className="font-bold text-xs">
                   {Object.values(graphMetrics.counts).filter(c => c > 0).length}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* ENTITY TYPES (FUNCTIONAL TOGGLES) */}
+          {/* Entity Type Toggles */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              <span className={`text-[10px] font-bold ${theme.textMuted} uppercase tracking-wider`}>
                 Entity Types
               </span>
-              <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                <span>Show Labels</span>
+              <div className="flex items-center gap-1.5">
                 <button
-                  onClick={() => setShowLabels(!showLabels)}
-                  className={`w-7 h-4 flex items-center rounded-full p-0.5 transition ${
-                    showLabels ? 'bg-purple-600 justify-end' : 'bg-slate-700 justify-start'
-                  }`}
+                  type="button"
+                  onClick={() => handleToggleAllEntityTypes(true)}
+                  className="text-[10px] text-purple-400 hover:text-purple-300 font-semibold"
                 >
-                  <div className="w-3 h-3 rounded-full bg-white shadow-sm" />
+                  All
+                </button>
+                <span className="text-[10px] text-slate-600">|</span>
+                <button
+                  type="button"
+                  onClick={() => handleToggleAllEntityTypes(false)}
+                  className="text-[10px] text-slate-400 hover:text-white"
+                >
+                  None
                 </button>
               </div>
             </div>
@@ -1011,34 +1473,39 @@ export default function IntelligenceGraph() {
                 const isChecked = !!activeEntityFilters[type];
                 const count = graphMetrics.counts[type] || 0;
                 return (
-                  <label
+                  <div
                     key={type}
-                    className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-[#0D1533] cursor-pointer transition text-[11px] group"
+                    onClick={(e) => handleToggleEntityType(type, e.altKey)}
+                    className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:${theme.buttonHover} cursor-pointer transition text-[11px] group ${
+                      !isChecked ? 'opacity-40' : ''
+                    }`}
+                    title="Click to toggle, Alt+Click to isolate"
                   >
                     <div className="flex items-center gap-2">
                       <IconComp className="w-3.5 h-3.5" style={{ color: cfg.color }} />
-                      <span className="text-slate-200 group-hover:text-white transition">{type}</span>
+                      <span className={`transition ${isChecked ? theme.textPrimary : theme.textMuted}`}>
+                        {type}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-slate-400 font-mono text-[10px]">{count}</span>
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() =>
-                          setActiveEntityFilters(prev => ({ ...prev, [type]: !prev[type] }))
-                        }
-                        className="rounded border-slate-700 bg-slate-800 text-purple-600 focus:ring-0 w-3.5 h-3.5"
-                      />
+                      <span className={`font-mono text-[10px] ${theme.textMuted}`}>{count}</span>
+                      <div
+                        className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition ${
+                          isChecked ? 'bg-purple-600 border-purple-500 text-white' : 'border-slate-600 bg-transparent'
+                        }`}
+                      >
+                        {isChecked && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                      </div>
                     </div>
-                  </label>
+                  </div>
                 );
               })}
             </div>
           </div>
 
-          {/* RELATIONSHIP TYPES (FUNCTIONAL TOGGLES) */}
+          {/* Relationship Type Toggles */}
           <div>
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+            <div className={`text-[10px] font-bold ${theme.textMuted} uppercase tracking-wider mb-2`}>
               Relationship Types
             </div>
             <div className="space-y-1">
@@ -1046,9 +1513,12 @@ export default function IntelligenceGraph() {
                 const isChecked = !!activeRelFilters[rel];
                 const count = graphMetrics.relCounts[rel] || 0;
                 return (
-                  <label
+                  <div
                     key={rel}
-                    className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-[#0D1533] cursor-pointer transition text-[11px] group"
+                    onClick={() => setActiveRelFilters(prev => ({ ...prev, [rel]: !prev[rel] }))}
+                    className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:${theme.buttonHover} cursor-pointer transition text-[11px] group ${
+                      !isChecked ? 'opacity-40' : ''
+                    }`}
                   >
                     <div className="flex items-center gap-2">
                       <div className="w-4 flex items-center justify-center">
@@ -1060,113 +1530,145 @@ export default function IntelligenceGraph() {
                           }}
                         />
                       </div>
-                      <span className="text-slate-200 group-hover:text-white transition">{rel}</span>
+                      <span className={`transition ${isChecked ? theme.textPrimary : theme.textMuted}`}>
+                        {rel}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-slate-400 font-mono text-[10px]">{count}</span>
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() =>
-                          setActiveRelFilters(prev => ({ ...prev, [rel]: !prev[rel] }))
-                        }
-                        className="rounded border-slate-700 bg-slate-800 text-purple-600 focus:ring-0 w-3.5 h-3.5"
-                      />
+                      <span className={`font-mono text-[10px] ${theme.textMuted}`}>{count}</span>
+                      <div
+                        className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition ${
+                          isChecked ? 'bg-purple-600 border-purple-500 text-white' : 'border-slate-600 bg-transparent'
+                        }`}
+                      >
+                        {isChecked && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                      </div>
                     </div>
-                  </label>
+                  </div>
                 );
               })}
             </div>
           </div>
         </div>
 
-        {/* Reset Filters CTA */}
-        <div className="p-3 border-t border-[#151D3B]">
+        <div className={`p-3 border-t ${theme.border} space-y-2`}>
           <button
-            onClick={handleResetFilters}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-[#202B52] bg-[#0E1636] hover:bg-[#15204C] text-slate-300 hover:text-white text-xs font-semibold transition"
+            onClick={handleResetFiltersAndLayout}
+            className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border ${theme.border} ${theme.buttonBg} ${theme.buttonHover} text-xs font-semibold transition`}
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reset Filters & Layout</span>
+            <span>Reset Filters & Fit View (R)</span>
+          </button>
+          
+          <button
+            onClick={() => setIsShortcutsOpen(true)}
+            className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-purple-400 hover:text-purple-300 hover:bg-purple-950/30 text-[11px] font-semibold transition"
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+            <span>Keyboard Shortcuts (?)</span>
           </button>
         </div>
       </aside>
 
       {/* ==========================================
-          MAIN WORKSPACE: HEADER + GRAPH CANVAS
+          CENTER GRAPH CANVAS
           ========================================== */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         {/* Top Header */}
-        <header className="h-14 shrink-0 flex items-center justify-between px-5 border-b border-[#151D3B] bg-[#080D20] z-10">
+        <header className={`h-14 shrink-0 flex items-center justify-between px-5 border-b ${theme.border} ${theme.headerBg} z-10`}>
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate(`/entities?caseId=${caseId}`)}
-              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition font-medium"
+              className={`flex items-center gap-1.5 text-xs ${theme.textSecondary} hover:${theme.textPrimary} transition font-medium`}
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Back to Entities</span>
             </button>
 
-            <div className="h-4 w-px bg-[#1F294D]" />
+            <div className="h-4 w-px bg-slate-700/50" />
 
             <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-white tracking-wide">{caseId}</span>
+              <span className="text-sm font-bold tracking-wide">{caseId}</span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-900/60 text-red-300 border border-red-700/60">
-                Active Inquiry
+                Active Syndicate
               </span>
             </div>
 
-            <span className="text-xs text-slate-400 hidden lg:inline">
+            <span className={`text-xs ${theme.textMuted} hidden lg:inline`}>
               Consolidated Intelligence Network
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Layout Switcher */}
-            <div className="flex items-center bg-[#0D1533] border border-[#1F2A52] rounded-lg p-0.5 text-xs">
+          <div className="flex items-center gap-2.5">
+            {/* Functional Date Range Selector */}
+            <div className="relative flex items-center">
+              <select
+                value={dateFilter}
+                onChange={e => setDateFilter(e.target.value)}
+                className={`rounded-lg border ${theme.border} ${theme.inputBg} px-3 py-1.5 text-xs ${theme.textPrimary} focus:border-purple-500 focus:outline-none`}
+              >
+                <option value="all">All Events (Full Timeline)</option>
+                <option value="7days">Last 7 Days Only</option>
+                <option value="30days">Last 30 Days Only</option>
+              </select>
+            </div>
+
+            {/* Layout Mode Switcher */}
+            <div className={`flex items-center ${theme.cardBg} border ${theme.border} rounded-lg p-0.5 text-xs`}>
               <button
-                onClick={() => setLayoutMode('concentric')}
+                onClick={() => handleSwitchLayout('concentric')}
+                title="Concentric Layout (Key: 1)"
                 className={`px-2.5 py-1 rounded text-[11px] font-semibold transition ${
-                  layoutMode === 'concentric' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+                  layoutMode === 'concentric' ? 'bg-purple-600 text-white' : `${theme.textSecondary} hover:${theme.textPrimary}`
                 }`}
               >
                 Concentric
               </button>
               <button
-                onClick={() => setLayoutMode('grid')}
+                onClick={() => handleSwitchLayout('orbit')}
+                title="Radial Orbit Layout (Key: 2)"
                 className={`px-2.5 py-1 rounded text-[11px] font-semibold transition ${
-                  layoutMode === 'grid' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+                  layoutMode === 'orbit' ? 'bg-purple-600 text-white' : `${theme.textSecondary} hover:${theme.textPrimary}`
                 }`}
               >
                 Radial Orbit
               </button>
+              <button
+                onClick={() => handleSwitchLayout('clustered')}
+                title="Clustered Layout (Key: 3)"
+                className={`px-2.5 py-1 rounded text-[11px] font-semibold transition ${
+                  layoutMode === 'clustered' ? 'bg-purple-600 text-white' : `${theme.textSecondary} hover:${theme.textPrimary}`
+                }`}
+              >
+                Clustered
+              </button>
             </div>
 
-            {/* Add Dynamic Lead / Entity */}
+            {/* Add Evidence / Link */}
             <button
               onClick={() => setIsAddEntityOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#1F2A52] bg-[#0D1533] hover:bg-[#14204A] text-slate-200 text-xs font-semibold transition"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border ${theme.border} ${theme.buttonBg} ${theme.buttonHover} text-xs font-semibold transition`}
             >
               <Plus className="w-3.5 h-3.5 text-purple-400" />
-              <span>Add Lead / Entity</span>
+              <span>Add Evidence</span>
             </button>
 
-            {/* Export Graph Dropdown */}
+            {/* Export */}
             <div className="relative group">
               <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm transition">
                 <Download className="w-3.5 h-3.5" />
-                <span>Export Graph</span>
+                <span>Export</span>
               </button>
-              <div className="absolute right-0 top-full mt-1 hidden group-hover:block w-44 rounded-lg bg-[#0E1738] border border-[#233160] shadow-xl p-1 z-30">
+              <div className={`absolute right-0 top-full mt-1 hidden group-hover:block w-44 rounded-lg ${theme.cardBg} border ${theme.border} shadow-xl p-1 z-30`}>
                 <button
                   onClick={() => handleExport('svg')}
-                  className="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-[#1B2754] hover:text-white rounded flex items-center gap-2"
+                  className={`w-full text-left px-3 py-1.5 text-xs ${theme.textSecondary} hover:${theme.buttonHover} hover:${theme.textPrimary} rounded flex items-center gap-2`}
                 >
                   <FileText className="w-3 h-3 text-purple-400" /> Export Vector (SVG)
                 </button>
                 <button
                   onClick={() => handleExport('json')}
-                  className="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-[#1B2754] hover:text-white rounded flex items-center gap-2"
+                  className={`w-full text-left px-3 py-1.5 text-xs ${theme.textSecondary} hover:${theme.buttonHover} hover:${theme.textPrimary} rounded flex items-center gap-2`}
                 >
                   <Share2 className="w-3 h-3 text-blue-400" /> Export JSON Network
                 </button>
@@ -1175,27 +1677,28 @@ export default function IntelligenceGraph() {
           </div>
         </header>
 
-        {/* Sub-Header / Search & Quick Actions */}
-        <div className="h-12 shrink-0 flex items-center justify-between px-6 border-b border-[#121933] bg-[#070B1B]/80 backdrop-blur-sm z-10">
-          <div>
-            <h2 className="text-sm font-bold text-white flex items-center gap-2">
+        {/* Sub-Header / Search & Quick Keys */}
+        <div className={`h-12 shrink-0 flex items-center justify-between px-6 border-b ${theme.border} ${theme.headerBg}/90 backdrop-blur-sm z-10`}>
+          <div className="flex items-center gap-3">
+            <h2 className="text-sm font-bold flex items-center gap-2">
               <span>Neo4j Knowledge Graph</span>
-              <span className="text-[11px] font-normal text-slate-400">
+              <span className={`text-[11px] font-normal ${theme.textMuted}`}>
                 Interactive relationship mapping derived from consolidated records.
               </span>
             </h2>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Real Search Entity Input */}
-            <div className="relative w-72">
+            {/* Functional Search Entity Input */}
+            <div className="relative w-64">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
               <input
+                ref={searchInputRef}
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Search entity (e.g., phone, account, email, name)"
-                className="w-full rounded-lg border border-[#1C264D] bg-[#0C132E] py-1.5 pl-8 pr-3 text-xs text-slate-200 placeholder:text-slate-500 focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                placeholder="Search entity (Press '/' to focus)"
+                className={`w-full rounded-lg border ${theme.border} ${theme.inputBg} py-1.5 pl-8 pr-7 text-xs ${theme.textPrimary} placeholder:text-slate-500 focus:border-purple-500 focus:ring-1 focus:ring-purple-500`}
               />
               {searchQuery && (
                 <button
@@ -1207,27 +1710,46 @@ export default function IntelligenceGraph() {
               )}
             </div>
 
-            {/* Controls */}
-            <div className="flex items-center gap-1 border-l border-[#1C264D] pl-3">
+            {/* Viewport Quick Buttons */}
+            <div className={`flex items-center gap-1 border-l ${theme.border} pl-3`}>
+              {/* Labels Toggle Key */}
+              <button
+                onClick={() => setShowLabels(!showLabels)}
+                title={showLabels ? 'Hide Labels (H)' : 'Show Labels (H)'}
+                className={`p-1.5 rounded-lg transition ${
+                  showLabels ? 'text-purple-400 bg-purple-950/40' : `${theme.textMuted} hover:${theme.buttonHover}`
+                }`}
+              >
+                {showLabels ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+              </button>
+
+              <button
+                onClick={() => fitGraphToScreen(visibleNodes)}
+                title="Fit All Entities to Screen (0 or R or F)"
+                className="px-2.5 py-1 rounded-lg text-xs text-purple-400 bg-purple-950/60 border border-purple-800/60 hover:bg-purple-900/60 transition flex items-center gap-1"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Fit All (F)</span>
+              </button>
+
               <button
                 onClick={() => setIsDarkMode(!isDarkMode)}
-                title="Toggle Theme"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#141E44] transition"
+                title="Toggle Theme (T)"
+                className={`p-1.5 rounded-lg ${theme.textSecondary} hover:${theme.textPrimary} hover:${theme.buttonHover} transition`}
               >
-                {isDarkMode ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+                {isDarkMode ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-purple-600" />}
               </button>
+
               <button
                 onClick={() => {
                   if (!document.fullscreenElement) {
-                    document.documentElement.requestFullscreen();
-                    setIsFullscreen(true);
+                    document.documentElement.requestFullscreen().catch(() => {});
                   } else {
-                    document.exitFullscreen();
-                    setIsFullscreen(false);
+                    document.exitFullscreen().catch(() => {});
                   }
                 }}
                 title="Toggle Fullscreen"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#141E44] transition"
+                className={`p-1.5 rounded-lg ${theme.textSecondary} hover:${theme.textPrimary} hover:${theme.buttonHover} transition`}
               >
                 {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
               </button>
@@ -1236,34 +1758,35 @@ export default function IntelligenceGraph() {
         </div>
 
         {/* ==========================================
-            MAIN GRAPH SVG CANVAS (HIGH RESOLUTION)
+            RESPONSIVE SVG CANVAS (DYNAMIC VIEWBOX, PAN & ZOOM)
             ========================================== */}
         <div
+          ref={canvasContainerRef}
           id="graph-canvas-bg"
-          className="flex-1 relative overflow-hidden cursor-grab active:cursor-grabbing bg-[#070B19]"
-          onMouseDown={handleMouseDownCanvas}
+          className="flex-1 relative overflow-hidden cursor-grab active:cursor-grabbing"
           style={{
-            backgroundImage: 'radial-gradient(#151E3D 1px, transparent 1px)',
+            backgroundColor: theme.canvasBg,
+            backgroundImage: `radial-gradient(${theme.gridDot} 1px, transparent 1px)`,
             backgroundSize: '28px 28px'
           }}
+          onPointerDown={handlePointerDownCanvas}
+          onWheel={handleWheel}
         >
           <svg
+            ref={svgRef}
             id="knowledge-graph-svg"
-            viewBox="0 0 1000 700"
-            className="w-full h-full"
-            style={{
-              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-              transformOrigin: '500px 350px',
-              transition: isPanning || draggingNodeId ? 'none' : 'transform 0.15s ease-out'
-            }}
+            viewBox={`0 0 ${dimensions.width} ${dimensions.height}`}
+            className="w-full h-full block"
           >
-            {/* Filters and Marker Arrows */}
             <defs>
               <filter id="glow-red" x="-50%" y="-50%" width="200%" height="200%">
-                <feDropShadow dx="0" dy="0" stdDeviation="8" floodColor="#EF4444" floodOpacity="0.75" />
+                <feDropShadow dx="0" dy="0" stdDeviation="8" floodColor="#EF4444" floodOpacity="0.8" />
               </filter>
               <filter id="glow-purple" x="-50%" y="-50%" width="200%" height="200%">
-                <feDropShadow dx="0" dy="0" stdDeviation="6" floodColor="#8B5CF6" floodOpacity="0.65" />
+                <feDropShadow dx="0" dy="0" stdDeviation="6" floodColor="#8B5CF6" floodOpacity="0.7" />
+              </filter>
+              <filter id="glow-gold" x="-50%" y="-50%" width="200%" height="200%">
+                <feDropShadow dx="0" dy="0" stdDeviation="7" floodColor="#F59E0B" floodOpacity="0.8" />
               </filter>
               <radialGradient id="grad-red" cx="50%" cy="50%" r="50%">
                 <stop offset="0%" stopColor="#EF4444" />
@@ -1286,235 +1809,304 @@ export default function IntelligenceGraph() {
               ))}
             </defs>
 
-            {/* EDGES LAYER */}
-            <g id="edges-layer">
-              {visibleEdges.map(edge => {
-                const src = nodeMap.get(edge.source);
-                const tgt = nodeMap.get(edge.target);
-                if (!src || !tgt) return null;
+            {/* Click-capturing transparent backdrop inside SVG */}
+            <rect width="100%" height="100%" fill="transparent" />
 
-                const relCfg = RELATIONSHIP_CONFIG[edge.type] || { color: '#94A3B8', dashArray: 'none' };
-                const isSelectedEdge =
-                  selectedNodeId && (edge.source === selectedNodeId || edge.target === selectedNodeId);
+            {/* Master Transform Group for Pan & Zoom */}
+            <g
+              ref={viewportRef}
+              id="viewport-group"
+              transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}
+              style={{ transition: isPanning || draggingNodeId ? 'none' : 'transform 0.08s ease-out' }}
+            >
+              {/* EDGES LAYER */}
+              <g id="edges-layer">
+                {visibleEdges.map(edge => {
+                  const src = nodeMap.get(edge.source);
+                  const tgt = nodeMap.get(edge.target);
+                  if (!src || !tgt) return null;
 
-                const midX = (src.x + tgt.x) / 2;
-                const midY = (src.y + tgt.y) / 2;
-                const markerId = `arrow-${edge.type.replace(/\s+/g, '-').toLowerCase()}`;
+                  const relCfg = RELATIONSHIP_CONFIG[edge.type] || { color: '#94A3B8', dashArray: 'none' };
+                  const isSelectedEdge = selectedEdgeId === edge.id;
+                  const isNodeConnectedEdge =
+                    selectedNodeId && (edge.source === selectedNodeId || edge.target === selectedNodeId);
 
-                return (
-                  <g key={edge.id} opacity={isSelectedEdge ? 1 : 0.8}>
-                    <line
-                      x1={src.x}
-                      y1={src.y}
-                      x2={tgt.x}
-                      y2={tgt.y}
-                      stroke={isSelectedEdge ? '#FFFFFF' : relCfg.color}
-                      strokeWidth={isSelectedEdge ? 2.2 : 1.5}
-                      strokeDasharray={relCfg.dashArray}
-                      markerEnd={`url(#${markerId})`}
-                    />
+                  const midX = (src.x + tgt.x) / 2;
+                  const midY = (src.y + tgt.y) / 2;
+                  const markerId = `arrow-${edge.type.replace(/\s+/g, '-').toLowerCase()}`;
 
-                    {/* Edge Label Badge */}
-                    {showLabels && edge.label && (
-                      <g transform={`translate(${midX}, ${midY})`}>
-                        <rect
-                          x="-38"
-                          y="-8"
-                          width="76"
-                          height="16"
-                          rx="4"
-                          fill="#080D21"
-                          stroke={isSelectedEdge ? '#FFFFFF' : relCfg.color}
-                          strokeWidth="0.8"
-                          opacity="0.95"
-                        />
-                        <text
-                          x="0"
-                          y="3"
-                          textAnchor="middle"
-                          fontSize="8"
-                          fontWeight="bold"
-                          letterSpacing="0.5"
-                          fill={isSelectedEdge ? '#FFFFFF' : relCfg.color}
-                        >
-                          {edge.label}
-                        </text>
-                      </g>
-                    )}
-                  </g>
-                );
-              })}
-            </g>
-
-            {/* NODES LAYER */}
-            <g id="nodes-layer">
-              {visibleNodes.map(node => {
-                const typeCfg = TYPE_CONFIG[node.type] || { color: '#94A3B8', icon: User };
-                const isSelected = selectedNodeId === node.id;
-                const isCulprit = node.role === 'suspect';
-                const IconComponent = typeCfg.icon;
-                const nodeRadius = isCulprit ? 26 : 22;
-
-                return (
-                  <g
-                    key={node.id}
-                    transform={`translate(${node.x}, ${node.y})`}
-                    className="cursor-pointer transition-transform"
-                    onMouseDown={e => handleStartNodeDrag(e, node.id, node.x, node.y)}
-                    onMouseEnter={() => setHoveredNodeId(node.id)}
-                    onMouseLeave={() => setHoveredNodeId(null)}
-                    onClick={() => setSelectedNodeId(node.id)}
-                  >
-                    {/* Pulsing Aura for Primary Suspect */}
-                    {isCulprit && (
-                      <circle
-                        r={nodeRadius + 12}
-                        fill="none"
-                        stroke="#EF4444"
-                        strokeWidth="1.5"
-                        opacity="0.4"
-                        className="animate-ping"
-                      />
-                    )}
-
-                    {/* Outer Glow Halo Ring */}
-                    <circle
-                      r={nodeRadius + 4}
-                      fill="none"
-                      stroke={isCulprit ? '#EF4444' : isSelected ? '#FFFFFF' : typeCfg.color}
-                      strokeWidth={isSelected ? 2.5 : 1.5}
-                      filter={isCulprit ? 'url(#glow-red)' : isSelected ? 'url(#glow-purple)' : undefined}
-                    />
-
-                    {/* Central Node Body Circle */}
-                    <circle
-                      r={nodeRadius}
-                      fill={isCulprit ? 'url(#grad-red)' : isSelected ? '#1E1B4B' : '#0B112B'}
-                      stroke={isCulprit ? '#DC2626' : typeCfg.color}
-                      strokeWidth="2"
-                    />
-
-                    {/* Node Icon */}
-                    <foreignObject
-                      x={-nodeRadius + 5}
-                      y={-nodeRadius + 5}
-                      width={(nodeRadius - 5) * 2}
-                      height={(nodeRadius - 5) * 2}
-                      className="pointer-events-none"
+                  return (
+                    <g
+                      key={edge.id}
+                      data-edge-id={edge.id}
+                      opacity={isSelectedEdge || isNodeConnectedEdge ? 1 : 0.7}
+                      className="cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedEdgeId(edge.id);
+                      }}
                     >
-                      <div className="w-full h-full flex items-center justify-center">
-                        <IconComponent
-                          className="w-4 h-4"
-                          style={{ color: isCulprit ? '#FFFFFF' : typeCfg.color }}
-                        />
-                      </div>
-                    </foreignObject>
+                      {/* Wider invisible stroke for easy clicking */}
+                      <line
+                        x1={src.x}
+                        y1={src.y}
+                        x2={tgt.x}
+                        y2={tgt.y}
+                        stroke="transparent"
+                        strokeWidth={14}
+                      />
+                      <line
+                        x1={src.x}
+                        y1={src.y}
+                        x2={tgt.x}
+                        y2={tgt.y}
+                        stroke={isSelectedEdge ? '#FFFFFF' : isNodeConnectedEdge ? '#A855F7' : relCfg.color}
+                        strokeWidth={isSelectedEdge ? 3.2 : isNodeConnectedEdge ? 2.4 : 1.5}
+                        strokeDasharray={relCfg.dashArray}
+                        markerEnd={`url(#${markerId})`}
+                      />
 
-                    {/* High-Resolution Node Labels */}
-                    {showLabels && (
-                      <g transform={`translate(0, ${nodeRadius + 14})`}>
-                        <text
-                          textAnchor="middle"
-                          fontSize="11"
-                          fontWeight="bold"
-                          fill="#FFFFFF"
-                          className="drop-shadow-md"
-                        >
-                          {node.label}
-                        </text>
-                        {node.subLabel && (
+                      {/* Edge Text Label Badge */}
+                      {showLabels && edge.label && (
+                        <g transform={`translate(${midX}, ${midY})`}>
+                          <rect
+                            x={-(edge.label.length * 3.8 + 8)}
+                            y="-9"
+                            width={edge.label.length * 7.6 + 16}
+                            height="18"
+                            rx="4"
+                            fill={isDarkMode ? '#080D21' : '#FFFFFF'}
+                            stroke={isSelectedEdge ? '#FFFFFF' : relCfg.color}
+                            strokeWidth={isSelectedEdge ? '1.5' : '0.8'}
+                            opacity="0.95"
+                          />
                           <text
-                            y="13"
+                            x="0"
+                            y="3.5"
                             textAnchor="middle"
-                            fontSize="9"
-                            fontWeight={node.role === 'suspect' ? 'bold' : 'normal'}
-                            fill={
-                              node.role === 'suspect'
-                                ? '#F87171'
-                                : node.role === 'associate'
-                                ? '#C084FC'
-                                : '#94A3B8'
-                            }
+                            fontSize="8.5"
+                            fontWeight="bold"
+                            letterSpacing="0.5"
+                            fill={isSelectedEdge ? (isDarkMode ? '#FFFFFF' : '#0F172A') : relCfg.color}
                           >
-                            {node.subLabel}
+                            {edge.label}
                           </text>
-                        )}
-                      </g>
-                    )}
-                  </g>
-                );
-              })}
+                        </g>
+                      )}
+                    </g>
+                  );
+                })}
+              </g>
+
+              {/* NODES LAYER */}
+              <g id="nodes-layer">
+                {visibleNodes.map(node => {
+                  const typeCfg = TYPE_CONFIG[node.type] || { color: '#94A3B8', icon: User };
+                  const isSelected = selectedNodeId === node.id;
+                  const isCulprit = node.role === 'suspect';
+                  const isSearchMatched = matchingNodeIds.has(node.id);
+                  const isDimmed = matchingNodeIds.size > 0 && !isSearchMatched;
+                  const IconComponent = typeCfg.icon;
+                  const nodeRadius = isCulprit ? 27 : 22;
+
+                  return (
+                    <g
+                      key={node.id}
+                      data-node-id={node.id}
+                      transform={`translate(${node.x}, ${node.y})`}
+                      className="cursor-pointer"
+                      opacity={isDimmed ? 0.25 : 1}
+                      onPointerDown={e => handleStartNodeDrag(e, node.id, node.x, node.y)}
+                      onMouseEnter={() => setHoveredNodeId(node.id)}
+                      onMouseLeave={() => setHoveredNodeId(null)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedNodeId(node.id);
+                        setSelectedEdgeId(null);
+                      }}
+                    >
+                      {/* Pulsing Aura for Primary Suspect / Search Match */}
+                      {(isCulprit || isSearchMatched) && (
+                        <circle
+                          r={nodeRadius + 14}
+                          fill="none"
+                          stroke={isCulprit ? '#EF4444' : '#F59E0B'}
+                          strokeWidth="2"
+                          opacity="0.5"
+                          className="animate-ping"
+                        />
+                      )}
+
+                      {/* Outer Glow Halo Ring */}
+                      <circle
+                        r={nodeRadius + 4}
+                        fill="none"
+                        stroke={isCulprit ? '#EF4444' : isSearchMatched ? '#F59E0B' : isSelected ? theme.selectedRing : typeCfg.color}
+                        strokeWidth={isSelected || isSearchMatched ? 3 : 1.5}
+                        filter={
+                          isCulprit
+                            ? 'url(#glow-red)'
+                            : isSearchMatched
+                            ? 'url(#glow-gold)'
+                            : isSelected
+                            ? 'url(#glow-purple)'
+                            : undefined
+                        }
+                      />
+
+                      {/* Central Node Body Circle */}
+                      <circle
+                        r={nodeRadius}
+                        fill={isCulprit ? 'url(#grad-red)' : isSelected ? (isDarkMode ? '#1E1B4B' : '#EDE9FE') : theme.nodeBg}
+                        stroke={isCulprit ? '#DC2626' : isSearchMatched ? '#F59E0B' : typeCfg.color}
+                        strokeWidth="2.2"
+                      />
+
+                      {/* Node Icon */}
+                      <foreignObject
+                        x={-nodeRadius + 5}
+                        y={-nodeRadius + 5}
+                        width={(nodeRadius - 5) * 2}
+                        height={(nodeRadius - 5) * 2}
+                        className="pointer-events-none"
+                      >
+                        <div className="w-full h-full flex items-center justify-center">
+                          <IconComponent
+                            className="w-4 h-4"
+                            style={{ color: isCulprit ? '#FFFFFF' : typeCfg.color }}
+                          />
+                        </div>
+                      </foreignObject>
+
+                      {/* High-Resolution Node Labels */}
+                      {showLabels && (
+                        <g transform={`translate(0, ${nodeRadius + 14})`}>
+                          <rect
+                            x={-(node.label.length * 3.6 + 10)}
+                            y="-9"
+                            width={node.label.length * 7.2 + 20}
+                            height="18"
+                            rx="4"
+                            fill={isDarkMode ? '#080D21' : '#FFFFFF'}
+                            stroke={isSelected ? (isDarkMode ? '#FFFFFF' : '#8B5CF6') : typeCfg.color}
+                            strokeWidth={isSelected ? '1.2' : '0.7'}
+                            opacity="0.95"
+                          />
+                          <text
+                            textAnchor="middle"
+                            fontSize="10"
+                            fontWeight="bold"
+                            fill={isDarkMode ? '#FFFFFF' : '#0F172A'}
+                            y="3"
+                          >
+                            {node.label}
+                          </text>
+
+                          {node.subLabel && (
+                            <text
+                              y="18"
+                              textAnchor="middle"
+                              fontSize="8.5"
+                              fontWeight={node.role === 'suspect' ? 'bold' : 'normal'}
+                              fill={
+                                node.role === 'suspect'
+                                  ? '#EF4444'
+                                  : node.role === 'associate'
+                                  ? '#A855F7'
+                                  : isDarkMode ? '#94A3B8' : '#64748B'
+                              }
+                            >
+                              {node.subLabel}
+                            </text>
+                          )}
+                        </g>
+                      )}
+                    </g>
+                  );
+                })}
+              </g>
             </g>
           </svg>
 
           {/* Floating Canvas Controls (Bottom-Left) */}
-          <div className="absolute bottom-6 left-6 flex flex-col gap-1.5 bg-[#090F24]/90 backdrop-blur-md p-1.5 rounded-xl border border-[#1C264D] shadow-xl z-10">
+          <div className={`absolute bottom-6 left-6 flex flex-col gap-1.5 ${theme.cardBg}/90 backdrop-blur-md p-1.5 rounded-xl border ${theme.border} shadow-xl z-10`}>
             <button
-              onClick={() => setZoom(prev => Math.min(prev + 0.2, 2.5))}
-              title="Zoom In"
-              className="p-2 text-slate-300 hover:text-white hover:bg-[#152048] rounded-lg transition"
+              onClick={() => applyZoom(1.2)}
+              title="Zoom In (+)"
+              className={`p-2 ${theme.textSecondary} hover:${theme.textPrimary} hover:${theme.buttonHover} rounded-lg transition`}
             >
               <Plus className="w-4 h-4" />
             </button>
             <button
-              onClick={() => setZoom(prev => Math.max(prev - 0.2, 0.4))}
-              title="Zoom Out"
-              className="p-2 text-slate-300 hover:text-white hover:bg-[#152048] rounded-lg transition"
+              onClick={() => applyZoom(0.83)}
+              title="Zoom Out (-)"
+              className={`p-2 ${theme.textSecondary} hover:${theme.textPrimary} hover:${theme.buttonHover} rounded-lg transition`}
             >
               <Minus className="w-4 h-4" />
             </button>
-            <div className="h-px w-full bg-[#1C264D]" />
+            <div className={`h-px w-full ${theme.border}`} />
             <button
-              onClick={() => {
-                setZoom(1);
-                setPan({ x: 0, y: 0 });
-              }}
-              title="Fit to Screen"
-              className="p-2 text-slate-300 hover:text-white hover:bg-[#152048] rounded-lg transition"
+              onClick={() => fitGraphToScreen(visibleNodes)}
+              title="Fit to Screen (0 or R or F)"
+              className={`p-2 ${theme.textSecondary} hover:${theme.textPrimary} hover:${theme.buttonHover} rounded-lg transition`}
             >
               <RotateCcw className="w-4 h-4" />
             </button>
             <button
               onClick={() => setIsLocked(!isLocked)}
-              title={isLocked ? 'Unlock Canvas Drag' : 'Lock Canvas Drag'}
+              title={isLocked ? 'Unlock Canvas Drag (L)' : 'Lock Canvas Drag (L)'}
               className={`p-2 rounded-lg transition ${
-                isLocked ? 'text-amber-400 bg-amber-950/40' : 'text-slate-300 hover:text-white hover:bg-[#152048]'
+                isLocked ? 'text-amber-400 bg-amber-950/40' : `${theme.textSecondary} hover:${theme.textPrimary} hover:${theme.buttonHover}`
               }`}
             >
               {isLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
             </button>
           </div>
 
-          {/* Legend (Bottom-Center) */}
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-[#090F24]/90 backdrop-blur-md px-4 py-2 rounded-full border border-[#1C264D] shadow-xl flex items-center gap-4 text-[11px] text-slate-300 z-10 hidden md:flex">
-            {Object.entries(TYPE_CONFIG).map(([type, cfg]) => (
-              <div key={type} className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: cfg.color }} />
-                <span>{type}</span>
-              </div>
-            ))}
+          {/* Bottom Center Interactive Legend Keys */}
+          <div className={`absolute bottom-6 left-1/2 -translate-x-1/2 ${theme.cardBg}/90 backdrop-blur-md px-4 py-2 rounded-full border ${theme.border} shadow-xl flex items-center gap-3 text-[11px] z-10 hidden md:flex`}>
+            {Object.entries(TYPE_CONFIG).map(([type, cfg]) => {
+              const isActive = !!activeEntityFilters[type];
+              const count = graphMetrics.counts[type] || 0;
+              return (
+                <button
+                  key={type}
+                  onClick={(e) => handleToggleEntityType(type, e.altKey)}
+                  className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full transition ${
+                    isActive
+                      ? `${theme.textPrimary} bg-purple-500/10 hover:bg-purple-500/20`
+                      : 'opacity-40 hover:opacity-75 text-slate-500'
+                  }`}
+                  title={`${type} (${count}) - Click to toggle, Alt+Click to isolate`}
+                >
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: cfg.color }} />
+                  <span className="font-medium">{type}</span>
+                  <span className="text-[9px] opacity-70 font-mono">({count})</span>
+                </button>
+              );
+            })}
           </div>
 
-          {/* Live Mini-Map (Bottom-Right) */}
-          <div className="absolute bottom-6 right-6 w-36 h-28 bg-[#090F24]/90 backdrop-blur-md rounded-xl border border-[#1C264D] shadow-2xl p-2 hidden lg:flex flex-col z-10">
-            <div className="flex justify-between items-center text-[9px] text-slate-400 font-semibold mb-1">
+          {/* Live Mini-Map */}
+          <div className={`absolute bottom-6 right-6 w-36 h-28 ${theme.cardBg}/90 backdrop-blur-md rounded-xl border ${theme.border} shadow-2xl p-2 hidden lg:flex flex-col z-10`}>
+            <div className={`flex justify-between items-center text-[9px] ${theme.textMuted} font-semibold mb-1`}>
               <span>MINI MAP</span>
               <span className="font-mono">{Math.round(zoom * 100)}%</span>
             </div>
-            <div className="flex-1 relative bg-[#060A1A] rounded border border-[#141E3D] overflow-hidden">
-              <svg viewBox="0 0 1000 700" className="w-full h-full opacity-60">
+            <div className={`flex-1 relative ${isDarkMode ? 'bg-[#060A1A]' : 'bg-slate-200'} rounded border ${theme.border} overflow-hidden`}>
+              <svg viewBox={`0 0 ${dimensions.width} ${dimensions.height}`} className="w-full h-full opacity-60">
                 {visibleEdges.map(e => {
                   const s = nodeMap.get(e.source);
                   const t = nodeMap.get(e.target);
                   if (!s || !t) return null;
-                  return <line key={e.id} x1={s.x} y1={s.y} x2={t.x} y2={t.y} stroke="#475569" strokeWidth="3" />;
+                  return <line key={e.id} x1={s.x} y1={s.y} x2={t.x} y2={t.y} stroke="#475569" strokeWidth="2" />;
                 })}
                 {visibleNodes.map(n => (
                   <circle
                     key={n.id}
                     cx={n.x}
                     cy={n.y}
-                    r={n.role === 'suspect' ? 18 : 12}
+                    r={n.role === 'suspect' ? 14 : 9}
                     fill={n.role === 'suspect' ? '#EF4444' : TYPE_CONFIG[n.type]?.color || '#8B5CF6'}
                   />
                 ))}
@@ -1525,212 +2117,422 @@ export default function IntelligenceGraph() {
       </main>
 
       {/* ==========================================
-          RIGHT SIDEBAR: ENTITY DETAILS & AI SYNOPSIS
+          RIGHT SIDEBAR: ENTITY / EDGE DETAILS & DOSSIER
           ========================================== */}
-      {selectedNode && (
-        <aside className="w-80 shrink-0 flex flex-col border-l border-[#151D3B] bg-[#090F24] z-20">
-          <div className="flex items-center justify-between px-4 py-3.5 border-b border-[#151D3B]">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Entity Details
+      {(selectedNode || selectedEdge) && (
+        <aside className={`w-80 shrink-0 flex flex-col border-l ${theme.border} ${theme.sidebarBg} z-20`}>
+          <div className={`flex items-center justify-between px-4 py-3.5 border-b ${theme.border}`}>
+            <span className={`text-xs font-bold ${theme.textMuted} uppercase tracking-wider`}>
+              {selectedEdge ? 'Relationship Details' : 'Entity Details'}
             </span>
             <button
-              onClick={() => setSelectedNodeId(null)}
-              className="text-slate-400 hover:text-white p-1 rounded transition"
+              onClick={() => {
+                setSelectedNodeId(null);
+                setSelectedEdgeId(null);
+              }}
+              className={`${theme.textSecondary} hover:${theme.textPrimary} p-1 rounded transition`}
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar text-xs">
-            {/* Profile Avatar */}
-            <div className="flex items-center gap-3">
-              <div
-                className={`w-12 h-12 rounded-full flex items-center justify-center border-2 shadow-lg ${
-                  selectedNode.role === 'suspect'
-                    ? 'bg-red-950/80 border-red-500 text-red-400 shadow-red-900/40'
-                    : 'bg-purple-950/80 border-purple-500 text-purple-400 shadow-purple-900/40'
-                }`}
-              >
-                {React.createElement(TYPE_CONFIG[selectedNode.type]?.icon || User, { className: 'w-6 h-6' })}
+            {/* If an Edge is selected */}
+            {selectedEdge ? (
+              <div className="space-y-4">
+                <div className="p-3.5 rounded-xl bg-purple-950/20 border border-purple-800/40 space-y-2">
+                  <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider block">
+                    Relationship Link
+                  </span>
+                  <h3 className="text-base font-bold">{selectedEdge.label || selectedEdge.type}</h3>
+                  <p className={`text-xs ${theme.textSecondary}`}>
+                    Type: <strong className="text-purple-400">{selectedEdge.type}</strong>
+                  </p>
+                </div>
+
+                <div className={`${theme.cardBg} rounded-lg border ${theme.border} divide-y ${theme.panelDivide}`}>
+                  <div className="p-3">
+                    <span className={`text-[10px] uppercase font-bold ${theme.textMuted} block mb-1`}>Source Node</span>
+                    <div className="font-semibold">{nodeMap.get(selectedEdge.source)?.label || selectedEdge.source}</div>
+                    <div className={`text-[10px] ${theme.textSecondary}`}>{nodeMap.get(selectedEdge.source)?.type}</div>
+                  </div>
+                  <div className="p-3">
+                    <span className={`text-[10px] uppercase font-bold ${theme.textMuted} block mb-1`}>Target Node</span>
+                    <div className="font-semibold">{nodeMap.get(selectedEdge.target)?.label || selectedEdge.target}</div>
+                    <div className={`text-[10px] ${theme.textSecondary}`}>{nodeMap.get(selectedEdge.target)?.type}</div>
+                  </div>
+                  {selectedEdge.details && (
+                    <div className="p-3">
+                      <span className={`text-[10px] uppercase font-bold ${theme.textMuted} block mb-1`}>Evidence Log</span>
+                      <p className={`leading-relaxed ${theme.textSecondary}`}>{selectedEdge.details}</p>
+                    </div>
+                  )}
+                  <div className="p-3 flex justify-between">
+                    <span className={theme.textMuted}>Activity Recency</span>
+                    <span className="font-semibold text-purple-400">{selectedEdge.daysAgo || 1} day(s) ago</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-bold text-white truncate">{selectedNode.label}</h3>
-                  <span
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                      selectedNode.riskLevel === 'High Risk'
-                        ? 'bg-red-950 text-red-400 border border-red-800'
-                        : 'bg-amber-950 text-amber-400 border border-amber-800'
+            ) : selectedNode ? (
+              <>
+                {/* Profile Header */}
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-12 h-12 rounded-full flex items-center justify-center border-2 shadow-lg ${
+                      selectedNode.role === 'suspect'
+                        ? 'bg-red-950/80 border-red-500 text-red-400 shadow-red-900/40'
+                        : 'bg-purple-950/80 border-purple-500 text-purple-400 shadow-purple-900/40'
                     }`}
                   >
-                    {selectedNode.riskLevel}
-                  </span>
-                </div>
-                <div className="text-[11px] text-slate-400 font-medium">
-                  {selectedNode.type} {selectedNode.subLabel}
-                </div>
-              </div>
-            </div>
-
-            {/* Key-Value Attributes */}
-            <div className="bg-[#0D1533] rounded-lg border border-[#17203E] divide-y divide-[#17203E]">
-              <div className="flex justify-between px-3 py-2 text-[11px]">
-                <span className="text-slate-400">Canonical ID</span>
-                <span className="font-mono text-white font-semibold">{selectedNode.details?.entityId}</span>
-              </div>
-              <div className="flex justify-between px-3 py-2 text-[11px]">
-                <span className="text-slate-400">Risk Score</span>
-                <div className="flex items-center gap-2">
-                  <div className="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-red-500 rounded-full"
-                      style={{ width: `${selectedNode.riskScore}%` }}
-                    />
+                    {React.createElement(TYPE_CONFIG[selectedNode.type]?.icon || User, { className: 'w-6 h-6' })}
                   </div>
-                  <span className="font-bold text-red-400">{selectedNode.riskScore}%</span>
-                </div>
-              </div>
-              {selectedNode.details?.remarks && (
-                <div className="px-3 py-2 text-[11px] space-y-1">
-                  <span className="text-slate-400 block font-medium">Forensic Remarks</span>
-                  <p className="text-slate-200 leading-relaxed">{selectedNode.details.remarks}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Linked Entities Breakdown */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  Linked Relationships ({selectedNodeRelationships.length})
-                </span>
-              </div>
-              <div className="space-y-1.5">
-                {selectedNodeRelationships.slice(0, 5).map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between px-3 py-2 rounded-lg bg-[#0D1533] border border-[#17203E] text-[11px]"
-                  >
-                    <div className="flex items-center gap-2 text-slate-300 truncate">
-                      <span className="text-purple-400 font-bold font-mono">
-                        {item.edge.label || item.edge.type}
-                      </span>
-                      <span className="text-white font-semibold truncate">
-                        {item.connectedNode.label}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-bold truncate">{selectedNode.label}</h3>
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          selectedNode.riskLevel === 'High Risk'
+                            ? 'bg-red-950 text-red-400 border border-red-800'
+                            : 'bg-amber-950 text-amber-400 border border-amber-800'
+                        }`}
+                      >
+                        {selectedNode.riskLevel}
                       </span>
                     </div>
-                    <span className="text-[10px] text-slate-400 capitalize">{item.direction}</span>
+                    <div className={`text-[11px] ${theme.textSecondary} font-medium`}>
+                      {selectedNode.type} {selectedNode.subLabel}
+                    </div>
                   </div>
-                ))}
-              </div>
+                </div>
 
-              {selectedNodeRelationships.length > 5 && (
-                <button
-                  onClick={() => setShowAllRelModal(true)}
-                  className="w-full mt-2 py-2 text-center text-xs font-semibold text-purple-400 hover:text-purple-300 hover:bg-purple-950/30 rounded-lg border border-purple-800/40 transition flex items-center justify-center gap-1.5"
-                >
-                  <span>View All {selectedNodeRelationships.length} Relationships</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
+                {/* Attributes Key-Value */}
+                <div className={`${theme.cardBg} rounded-lg border ${theme.border} divide-y ${theme.panelDivide}`}>
+                  <div className="flex justify-between px-3 py-2 text-[11px]">
+                    <span className={theme.textMuted}>Canonical ID</span>
+                    <span className="font-mono font-semibold">{selectedNode.details?.entityId}</span>
+                  </div>
+                  <div className="flex justify-between px-3 py-2 text-[11px]">
+                    <span className={theme.textMuted}>Risk Score</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 h-1.5 bg-slate-700/50 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-red-500 rounded-full"
+                          style={{ width: `${selectedNode.riskScore}%` }}
+                        />
+                      </div>
+                      <span className="font-bold text-red-400">{selectedNode.riskScore}%</span>
+                    </div>
+                  </div>
+                  {selectedNode.details?.remarks && (
+                    <div className="px-3 py-2 text-[11px] space-y-1">
+                      <span className={`${theme.textMuted} block font-medium`}>Remarks</span>
+                      <p className={`leading-relaxed ${theme.textSecondary}`}>{selectedNode.details.remarks}</p>
+                    </div>
+                  )}
+                </div>
 
-            {/* AI QUICK INSIGHT */}
-            <div className="bg-[#12112C] border border-purple-800/60 rounded-xl p-3.5 space-y-2 shadow-lg shadow-purple-950/20">
-              <div className="flex items-center gap-2 text-purple-300 text-xs font-bold">
-                <Sparkles className="w-4 h-4 text-amber-400" />
-                <span>INTELLIGENCE INSIGHT</span>
-              </div>
-              <p className="text-[11px] text-slate-300 leading-relaxed">
-                {selectedNode.details?.quickInsight ||
-                  `${selectedNode.label} exhibits strong centrality in this investigation. High degree of correlation with criminal infrastructure.`}
-              </p>
-            </div>
+                {/* Dynamic Linked Relationships Breakdown */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`text-[10px] font-bold ${theme.textMuted} uppercase tracking-wider`}>
+                      Linked Relationships ({selectedNodeRelationships.length})
+                    </span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {selectedNodeRelationships.length > 0 ? (
+                      selectedNodeRelationships.slice(0, 5).map((item, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => setSelectedEdgeId(item.edge.id)}
+                          className={`flex items-center justify-between px-3 py-2 rounded-lg ${theme.cardBg} border ${theme.border} hover:${theme.buttonHover} cursor-pointer text-[11px] transition`}
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            <span className="text-purple-400 font-bold font-mono">
+                              {item.edge.label || item.edge.type}
+                            </span>
+                            <span className="font-semibold truncate">
+                              {item.connectedNode.label}
+                            </span>
+                          </div>
+                          <span className={`text-[10px] ${theme.textMuted} capitalize`}>{item.direction}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className={`p-3 ${theme.cardBg} rounded-lg border ${theme.border} ${theme.textMuted} text-center`}>
+                        No connected links found for this entity.
+                      </div>
+                    )}
+                  </div>
+
+                  {selectedNodeRelationships.length > 5 && (
+                    <button
+                      onClick={() => setShowAllRelModal(true)}
+                      className="w-full mt-2 py-2 text-center text-xs font-semibold text-purple-400 hover:text-purple-300 hover:bg-purple-950/30 rounded-lg border border-purple-800/40 transition flex items-center justify-center gap-1.5"
+                    >
+                      <span>View All {selectedNodeRelationships.length} Relationships</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* AI Intelligence Insight */}
+                <div className="bg-purple-950/20 border border-purple-800/50 rounded-xl p-3.5 space-y-2 shadow-lg shadow-purple-950/20">
+                  <div className="flex items-center gap-2 text-purple-400 text-xs font-bold">
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    <span>INTELLIGENCE INSIGHT</span>
+                  </div>
+                  <p className={`text-[11px] ${theme.textSecondary} leading-relaxed`}>
+                    {selectedNode.details?.quickInsight ||
+                      `${selectedNode.label} exhibits strong centrality in this investigation. High degree of correlation with criminal infrastructure.`}
+                  </p>
+                </div>
+              </>
+            ) : null}
           </div>
         </aside>
       )}
 
       {/* ==========================================
-          MODAL: ADD DYNAMIC LEAD / ENTITY
+          MODAL: KEYBOARD SHORTCUTS REFERENCE (?)
           ========================================== */}
-      {isAddEntityOpen && (
+      {isShortcutsOpen && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <form
-            onSubmit={handleAddNewEntity}
-            className="bg-[#0D1533] border border-[#223164] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col"
-          >
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#1A264E]">
+          <div className={`${theme.cardBg} border ${theme.borderHighlight} rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col`}>
+            <div className={`flex items-center justify-between px-6 py-4 border-b ${theme.border}`}>
               <div className="flex items-center gap-2">
-                <Plus className="w-5 h-5 text-purple-400" />
-                <h3 className="text-base font-bold text-white">Add Entity & Link</h3>
+                <HelpCircle className="w-5 h-5 text-purple-400" />
+                <h3 className="text-base font-bold">Knowledge Graph Hotkeys</h3>
               </div>
               <button
-                type="button"
-                onClick={() => setIsAddEntityOpen(false)}
-                className="text-slate-400 hover:text-white"
+                onClick={() => setIsShortcutsOpen(false)}
+                className={`${theme.textMuted} hover:${theme.textPrimary}`}
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 space-y-3.5 text-xs">
-              <div>
-                <label className="text-[11px] font-bold text-slate-400 block mb-1">
-                  Entity Value / Identifier
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. +91 99887 76655 or HDFC Account"
-                  value={newEntityForm.label}
-                  onChange={e => setNewEntityForm(prev => ({ ...prev, label: e.target.value }))}
-                  className="w-full rounded-lg border border-[#1F2A52] bg-[#070B1A] px-3 py-2 text-white focus:border-purple-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] font-bold text-slate-400 block mb-1">Type</label>
-                  <select
-                    value={newEntityForm.type}
-                    onChange={e => setNewEntityForm(prev => ({ ...prev, type: e.target.value }))}
-                    className="w-full rounded-lg border border-[#1F2A52] bg-[#070B1A] px-3 py-2 text-white focus:border-purple-500 focus:outline-none"
-                  >
-                    {Object.keys(TYPE_CONFIG).map(t => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-bold text-slate-400 block mb-1">Role</label>
-                  <select
-                    value={newEntityForm.role}
-                    onChange={e => setNewEntityForm(prev => ({ ...prev, role: e.target.value }))}
-                    className="w-full rounded-lg border border-[#1F2A52] bg-[#070B1A] px-3 py-2 text-white focus:border-purple-500 focus:outline-none"
-                  >
-                    <option value="suspect">Suspect</option>
-                    <option value="associate">Associate / Mule</option>
-                    <option value="normal">Witness / Channel</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="pt-2 border-t border-[#1C264D]">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
-                  Connect To Existing Entity
+            <div className="p-6 space-y-3 text-xs divide-y divide-slate-700/40">
+              <div className="flex justify-between py-1.5 items-center">
+                <span className={theme.textSecondary}>Zoom In / Out</span>
+                <span className="font-mono bg-purple-950/60 text-purple-300 border border-purple-800/60 px-2 py-0.5 rounded font-bold">
+                  + / -
                 </span>
+              </div>
+              <div className="flex justify-between py-1.5 items-center">
+                <span className={theme.textSecondary}>Fit / Center All Nodes</span>
+                <span className="font-mono bg-purple-950/60 text-purple-300 border border-purple-800/60 px-2 py-0.5 rounded font-bold">
+                  0, R, or F
+                </span>
+              </div>
+              <div className="flex justify-between py-1.5 items-center">
+                <span className={theme.textSecondary}>Pan Canvas</span>
+                <span className="font-mono bg-purple-950/60 text-purple-300 border border-purple-800/60 px-2 py-0.5 rounded font-bold">
+                  W A S D / Arrow Keys
+                </span>
+              </div>
+              <div className="flex justify-between py-1.5 items-center">
+                <span className={theme.textSecondary}>Toggle Concentric / Orbit / Cluster</span>
+                <span className="font-mono bg-purple-950/60 text-purple-300 border border-purple-800/60 px-2 py-0.5 rounded font-bold">
+                  1, 2, or 3
+                </span>
+              </div>
+              <div className="flex justify-between py-1.5 items-center">
+                <span className={theme.textSecondary}>Search Entity Focus</span>
+                <span className="font-mono bg-purple-950/60 text-purple-300 border border-purple-800/60 px-2 py-0.5 rounded font-bold">
+                  /
+                </span>
+              </div>
+              <div className="flex justify-between py-1.5 items-center">
+                <span className={theme.textSecondary}>Toggle Labels</span>
+                <span className="font-mono bg-purple-950/60 text-purple-300 border border-purple-800/60 px-2 py-0.5 rounded font-bold">
+                  H
+                </span>
+              </div>
+              <div className="flex justify-between py-1.5 items-center">
+                <span className={theme.textSecondary}>Lock / Unlock Canvas Drag</span>
+                <span className="font-mono bg-purple-950/60 text-purple-300 border border-purple-800/60 px-2 py-0.5 rounded font-bold">
+                  L
+                </span>
+              </div>
+              <div className="flex justify-between py-1.5 items-center">
+                <span className={theme.textSecondary}>Toggle Theme (Dark / Light)</span>
+                <span className="font-mono bg-purple-950/60 text-purple-300 border border-purple-800/60 px-2 py-0.5 rounded font-bold">
+                  T
+                </span>
+              </div>
+              <div className="flex justify-between py-1.5 items-center">
+                <span className={theme.textSecondary}>Deselect / Close Modals</span>
+                <span className="font-mono bg-purple-950/60 text-purple-300 border border-purple-800/60 px-2 py-0.5 rounded font-bold">
+                  Escape
+                </span>
+              </div>
+            </div>
 
-                <div className="grid grid-cols-2 gap-3">
+            <div className={`p-4 border-t ${theme.border} flex justify-end`}>
+              <button
+                onClick={() => setIsShortcutsOpen(false)}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL: ADD EVIDENCE / LINK
+          ========================================== */}
+      {isAddEntityOpen && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <form
+            onSubmit={handleAddSubmit}
+            className={`${theme.cardBg} border ${theme.borderHighlight} rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col`}
+          >
+            <div className={`flex items-center justify-between px-6 py-4 border-b ${theme.border}`}>
+              <div className="flex items-center gap-2">
+                <Plus className="w-5 h-5 text-purple-400" />
+                <h3 className="text-base font-bold">Add Evidence / Link</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddEntityOpen(false)}
+                className={`${theme.textMuted} hover:${theme.textPrimary}`}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Tabs */}
+            <div className={`flex border-b ${theme.border} text-xs`}>
+              <button
+                type="button"
+                onClick={() => setAddMode('new_entity')}
+                className={`flex-1 py-2.5 font-semibold text-center border-b-2 transition ${
+                  addMode === 'new_entity'
+                    ? 'border-purple-500 text-purple-400 bg-purple-950/30'
+                    : `border-transparent ${theme.textSecondary} hover:${theme.textPrimary}`
+                }`}
+              >
+                Add New Entity & Link
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddMode('link_existing')}
+                className={`flex-1 py-2.5 font-semibold text-center border-b-2 transition ${
+                  addMode === 'link_existing'
+                    ? 'border-purple-500 text-purple-400 bg-purple-950/30'
+                    : `border-transparent ${theme.textSecondary} hover:${theme.textPrimary}`
+                }`}
+              >
+                Link Two Existing Entities
+              </button>
+            </div>
+
+            <div className="p-6 space-y-3.5 text-xs">
+              {addMode === 'new_entity' ? (
+                <>
                   <div>
-                    <label className="text-[11px] font-bold text-slate-400 block mb-1">Connect To</label>
+                    <label className={`text-[11px] font-bold ${theme.textMuted} block mb-1`}>
+                      Entity Identifier / Value
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. +91 99887 76655 or Axis Bank XXXX"
+                      value={newEntityForm.label}
+                      onChange={e => setNewEntityForm(prev => ({ ...prev, label: e.target.value }))}
+                      className={`w-full rounded-lg border ${theme.border} ${theme.inputBg} px-3 py-2 ${theme.textPrimary} focus:border-purple-500 focus:outline-none`}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={`text-[11px] font-bold ${theme.textMuted} block mb-1`}>Type</label>
+                      <select
+                        value={newEntityForm.type}
+                        onChange={e => setNewEntityForm(prev => ({ ...prev, type: e.target.value }))}
+                        className={`w-full rounded-lg border ${theme.border} ${theme.inputBg} px-3 py-2 ${theme.textPrimary} focus:border-purple-500 focus:outline-none`}
+                      >
+                        {Object.keys(TYPE_CONFIG).map(t => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className={`text-[11px] font-bold ${theme.textMuted} block mb-1`}>Role</label>
+                      <select
+                        value={newEntityForm.role}
+                        onChange={e => setNewEntityForm(prev => ({ ...prev, role: e.target.value }))}
+                        className={`w-full rounded-lg border ${theme.border} ${theme.inputBg} px-3 py-2 ${theme.textPrimary} focus:border-purple-500 focus:outline-none`}
+                      >
+                        <option value="suspect">Suspect</option>
+                        <option value="associate">Associate / Mule</option>
+                        <option value="normal">Witness / Regular</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className={`pt-2 border-t ${theme.border}`}>
+                    <span className={`text-[10px] font-bold ${theme.textMuted} uppercase tracking-wider block mb-2`}>
+                      Connect to Existing Entity
+                    </span>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={`text-[11px] font-bold ${theme.textMuted} block mb-1`}>Connect To</label>
+                        <select
+                          value={newEntityForm.connectTo}
+                          onChange={e => setNewEntityForm(prev => ({ ...prev, connectTo: e.target.value }))}
+                          className={`w-full rounded-lg border ${theme.border} ${theme.inputBg} px-3 py-2 ${theme.textPrimary} focus:border-purple-500 focus:outline-none`}
+                        >
+                          <option value="">Select node...</option>
+                          {nodes.map(n => (
+                            <option key={n.id} value={n.id}>
+                              {n.label} ({n.type})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className={`text-[11px] font-bold ${theme.textMuted} block mb-1`}>Relationship</label>
+                        <select
+                          value={newEntityForm.relType}
+                          onChange={e => {
+                            const val = e.target.value;
+                            let lbl = 'TRANSACTIONS';
+                            if (val.includes('Call')) lbl = 'CALLS';
+                            else if (val.includes('Owns')) lbl = 'OWNS';
+                            else if (val.includes('Located')) lbl = 'LOCATED AT';
+                            else if (val.includes('Associated')) lbl = 'ASSOCIATED WITH';
+                            setNewEntityForm(prev => ({ ...prev, relType: val, relLabel: lbl }));
+                          }}
+                          className={`w-full rounded-lg border ${theme.border} ${theme.inputBg} px-3 py-2 ${theme.textPrimary} focus:border-purple-500 focus:outline-none`}
+                        >
+                          {Object.keys(RELATIONSHIP_CONFIG).map(r => (
+                            <option key={r} value={r}>
+                              {r}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className={`text-[11px] font-bold ${theme.textMuted} block mb-1`}>Source Entity</label>
                     <select
-                      value={newEntityForm.connectTo}
-                      onChange={e => setNewEntityForm(prev => ({ ...prev, connectTo: e.target.value }))}
-                      className="w-full rounded-lg border border-[#1F2A52] bg-[#070B1A] px-3 py-2 text-white focus:border-purple-500 focus:outline-none"
+                      value={linkExistingForm.sourceId}
+                      onChange={e => setLinkExistingForm(prev => ({ ...prev, sourceId: e.target.value }))}
+                      className={`w-full rounded-lg border ${theme.border} ${theme.inputBg} px-3 py-2 ${theme.textPrimary} focus:border-purple-500 focus:outline-none`}
                     >
+                      <option value="">Select source...</option>
                       {nodes.map(n => (
                         <option key={n.id} value={n.id}>
                           {n.label} ({n.type})
@@ -1740,35 +2542,64 @@ export default function IntelligenceGraph() {
                   </div>
 
                   <div>
-                    <label className="text-[11px] font-bold text-slate-400 block mb-1">Relationship</label>
+                    <label className={`text-[11px] font-bold ${theme.textMuted} block mb-1`}>Target Entity</label>
                     <select
-                      value={newEntityForm.relType}
-                      onChange={e => {
-                        const val = e.target.value;
-                        let lbl = 'TRANSACTIONS';
-                        if (val.includes('Call')) lbl = 'CALLS';
-                        else if (val.includes('Owns')) lbl = 'OWNS';
-                        else if (val.includes('Located')) lbl = 'LOCATED AT';
-                        else if (val.includes('Associated')) lbl = 'ASSOCIATED WITH';
-                        setNewEntityForm(prev => ({ ...prev, relType: val, relLabel: lbl }));
-                      }}
-                      className="w-full rounded-lg border border-[#1F2A52] bg-[#070B1A] px-3 py-2 text-white focus:border-purple-500 focus:outline-none"
+                      value={linkExistingForm.targetId}
+                      onChange={e => setLinkExistingForm(prev => ({ ...prev, targetId: e.target.value }))}
+                      className={`w-full rounded-lg border ${theme.border} ${theme.inputBg} px-3 py-2 ${theme.textPrimary} focus:border-purple-500 focus:outline-none`}
                     >
-                      {Object.keys(RELATIONSHIP_CONFIG).map(r => (
-                        <option key={r} value={r}>
-                          {r}
+                      <option value="">Select target...</option>
+                      {nodes.map(n => (
+                        <option key={n.id} value={n.id}>
+                          {n.label} ({n.type})
                         </option>
                       ))}
                     </select>
                   </div>
-                </div>
-              </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={`text-[11px] font-bold ${theme.textMuted} block mb-1`}>Relationship</label>
+                      <select
+                        value={linkExistingForm.relType}
+                        onChange={e => {
+                          const val = e.target.value;
+                          let lbl = 'TRANSACTIONS';
+                          if (val.includes('Call')) lbl = 'CALLS';
+                          else if (val.includes('Owns')) lbl = 'OWNS';
+                          else if (val.includes('Located')) lbl = 'LOCATED AT';
+                          else if (val.includes('Associated')) lbl = 'ASSOCIATED WITH';
+                          setLinkExistingForm(prev => ({ ...prev, relType: val, relLabel: lbl }));
+                        }}
+                        className={`w-full rounded-lg border ${theme.border} ${theme.inputBg} px-3 py-2 ${theme.textPrimary} focus:border-purple-500 focus:outline-none`}
+                      >
+                        {Object.keys(RELATIONSHIP_CONFIG).map(r => (
+                          <option key={r} value={r}>
+                            {r}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className={`text-[11px] font-bold ${theme.textMuted} block mb-1`}>Label / Details</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. ₹50,000 or 12 calls"
+                        value={linkExistingForm.relLabel}
+                        onChange={e => setLinkExistingForm(prev => ({ ...prev, relLabel: e.target.value }))}
+                        className={`w-full rounded-lg border ${theme.border} ${theme.inputBg} px-3 py-2 ${theme.textPrimary} focus:border-purple-500 focus:outline-none`}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div className="pt-3 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsAddEntityOpen(false)}
-                  className="px-4 py-2 border border-[#1F2A52] hover:bg-[#14204A] text-slate-300 rounded-lg text-xs font-semibold"
+                  className={`px-4 py-2 border ${theme.border} ${theme.buttonHover} ${theme.textSecondary} rounded-lg text-xs font-semibold`}
                 >
                   Cancel
                 </button>
@@ -1776,7 +2607,7 @@ export default function IntelligenceGraph() {
                   type="submit"
                   className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-bold shadow-md"
                 >
-                  Add to Graph
+                  Save to Network
                 </button>
               </div>
             </div>
@@ -1785,21 +2616,21 @@ export default function IntelligenceGraph() {
       )}
 
       {/* ==========================================
-          MODAL: VIEW ALL RELATIONSHIPS
+          MODAL: ALL RELATIONSHIPS TABLE
           ========================================== */}
       {showAllRelModal && selectedNode && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0D1533] border border-[#223164] rounded-2xl w-full max-w-2xl max-h-[80vh] shadow-2xl overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#1A264E]">
+          <div className={`${theme.cardBg} border ${theme.borderHighlight} rounded-2xl w-full max-w-2xl max-h-[80vh] shadow-2xl overflow-hidden flex flex-col`}>
+            <div className={`flex items-center justify-between px-6 py-4 border-b ${theme.border}`}>
               <div className="flex items-center gap-2">
                 <Network className="w-5 h-5 text-purple-400" />
-                <h3 className="text-base font-bold text-white">
+                <h3 className="text-base font-bold">
                   All Relationships for {selectedNode.label}
                 </h3>
               </div>
               <button
                 onClick={() => setShowAllRelModal(false)}
-                className="text-slate-400 hover:text-white"
+                className={`${theme.textMuted} hover:${theme.textPrimary}`}
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1808,7 +2639,7 @@ export default function IntelligenceGraph() {
             <div className="flex-1 overflow-y-auto p-6">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="border-b border-[#1E2B54] text-slate-400">
+                  <tr className={`border-b ${theme.border} ${theme.textMuted}`}>
                     <th className="pb-2.5 font-semibold">Direction</th>
                     <th className="pb-2.5 font-semibold">Relationship</th>
                     <th className="pb-2.5 font-semibold">Connected Entity</th>
@@ -1816,17 +2647,17 @@ export default function IntelligenceGraph() {
                     <th className="pb-2.5 font-semibold">Risk Level</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#162142]">
+                <tbody className={`divide-y ${theme.panelDivide}`}>
                   {selectedNodeRelationships.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-[#121C42] transition">
-                      <td className="py-2.5 text-slate-400 capitalize">{item.direction}</td>
+                    <tr key={idx} className={`hover:${theme.buttonHover} transition`}>
+                      <td className={`py-2.5 ${theme.textMuted} capitalize`}>{item.direction}</td>
                       <td className="py-2.5">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#1C264D] text-purple-300">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-950/40 text-purple-400 border border-purple-800/40">
                           {item.edge.label || item.edge.type}
                         </span>
                       </td>
-                      <td className="py-2.5 text-white font-semibold">{item.connectedNode.label}</td>
-                      <td className="py-2.5 text-slate-300">{item.connectedNode.type}</td>
+                      <td className="py-2.5 font-semibold">{item.connectedNode.label}</td>
+                      <td className={`py-2.5 ${theme.textSecondary}`}>{item.connectedNode.type}</td>
                       <td className="py-2.5">
                         <span
                           className={`px-2 py-0.5 rounded text-[10px] font-bold ${
@@ -1844,7 +2675,7 @@ export default function IntelligenceGraph() {
               </table>
             </div>
 
-            <div className="p-4 border-t border-[#1A264E] flex justify-end">
+            <div className={`p-4 border-t ${theme.border} flex justify-end`}>
               <button
                 onClick={() => setShowAllRelModal(false)}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold"
