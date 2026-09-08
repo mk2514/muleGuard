@@ -103,6 +103,30 @@ def init_db():
         )
     """)
 
+    # 6. Temporal Intelligence Engine Table (Timeline Events)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS timeline_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            case_id TEXT NOT NULL,
+            time_str TEXT NOT NULL,
+            full_timestamp TEXT,
+            event_type TEXT NOT NULL,
+            description TEXT NOT NULL,
+            entity_or_account TEXT,
+            location TEXT,
+            risk_level TEXT DEFAULT 'Low',
+            risk_score INTEGER DEFAULT 25,
+            amount TEXT,
+            source TEXT,
+            target TEXT,
+            device_or_sim TEXT,
+            remarks TEXT,
+            category TEXT,
+            created_at TEXT,
+            FOREIGN KEY (case_id) REFERENCES cases(case_id)
+        )
+    """)
+
     # Seed Default Cases if table is empty
     cursor.execute("SELECT COUNT(*) as cnt FROM cases")
     row = cursor.fetchone()
@@ -333,4 +357,46 @@ def save_custody_log(case_id: str, entry: Dict[str, Any]) -> bool:
     conn.commit()
     conn.close()
     return True
+
+
+def get_timeline_events(case_id: str) -> List[Dict[str, Any]]:
+    """Retrieves chronological timeline events for a case."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM timeline_events WHERE case_id = ? ORDER BY full_timestamp ASC, id ASC", (case_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def save_timeline_event(case_id: str, ev: Dict[str, Any]) -> bool:
+    """Inserts a single chronological event into SQLite."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("""
+        INSERT INTO timeline_events (case_id, time_str, full_timestamp, event_type, description, entity_or_account, location, risk_level, risk_score, amount, source, target, device_or_sim, remarks, category, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        case_id,
+        ev.get("time_str", "10:00 AM"),
+        ev.get("full_timestamp", f"2025-05-20 {ev.get('time_str', '10:00 AM')}"),
+        ev.get("event_type", "Activity"),
+        ev.get("description", ""),
+        ev.get("entity_or_account", ""),
+        ev.get("location", "Chennai"),
+        ev.get("risk_level", "Low"),
+        ev.get("risk_score", 25),
+        ev.get("amount", ""),
+        ev.get("source", ""),
+        ev.get("target", ""),
+        ev.get("device_or_sim", ""),
+        ev.get("remarks", ""),
+        ev.get("category", "General"),
+        now_str
+    ))
+    conn.commit()
+    conn.close()
+    return True
+
 
