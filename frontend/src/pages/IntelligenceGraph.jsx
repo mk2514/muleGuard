@@ -41,7 +41,8 @@ import {
   Eye,
   EyeOff,
   Radio,
-  Zap
+  Zap,
+  Database
 } from 'lucide-react';
 
 // ==========================================
@@ -1217,6 +1218,102 @@ export default function IntelligenceGraph() {
     };
   }, []);
 
+  // Neo4j Integration & Cypher Export Handlers
+  const [isSyncingNeo4j, setIsSyncingNeo4j] = useState(false);
+  const [neo4jFeedback, setNeo4jFeedback] = useState(null);
+
+  const handleExportCypher = useCallback(() => {
+    const lines = [
+      `// ========================================================`,
+      `// MuleGuard AI - Automated Neo4j Cypher Import Script`,
+      `// Case ID: ${caseId}`,
+      `// Generated from Live Consolidated Intelligence Graph`,
+      `// ========================================================\n`,
+      `CREATE CONSTRAINT entity_id IF NOT EXISTS FOR (e:Entity) REQUIRE e.id IS UNIQUE;\n`,
+      `// 1. Merge Nodes`
+    ];
+
+    nodes.forEach(n => {
+      const id = String(n.id).replace(/'/g, "\\'");
+      const name = String(n.label || n.name || id).replace(/'/g, "\\'");
+      const type = String(n.type || n.role || "ENTITY").toUpperCase().replace(/\s+/g, "_");
+      const score = Number(n.riskScore || 0);
+      lines.push(`MERGE (e:Entity {id: '${id}', case_id: '${caseId}'}) ON CREATE SET e.name = '${name}', e.type = '${type}', e.risk_score = ${score};`);
+    });
+
+    lines.push(`\n// 2. Merge Relationships`);
+    edges.forEach(e => {
+      const src = String(e.source).replace(/'/g, "\\'");
+      const tgt = String(e.target).replace(/'/g, "\\'");
+      const amt = String(e.amount || e.label || "0").replace(/[₹,]/g, "").trim();
+      const rel = String(e.type || "TRANSACTED_WITH").toUpperCase().replace(/\s+/g, "_");
+      lines.push(`MERGE (s:Entity {id: '${src}', case_id: '${caseId}'}) MERGE (t:Entity {id: '${tgt}', case_id: '${caseId}'}) CREATE (s)-[:${rel} {amount: '${amt}', case_id: '${caseId}'}]->(t);`);
+    });
+
+    const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${caseId}_neo4j_graph.cypher`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [nodes, edges, caseId]);
+
+  const handleSyncNeo4j = useCallback(async () => {
+    setIsSyncingNeo4j(true);
+    setNeo4jFeedback(null);
+    try {
+      const apiUrls = ['http://127.0.0.1:8000/api/neo4j/sync', '/api/neo4j/sync'];
+      let synced = false;
+      for (const url of apiUrls) {
+        try {
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              case_id: caseId,
+              records: edges.map(e => ({
+                source: e.source,
+                target: e.target,
+                amount: e.amount || e.label,
+                type: e.type,
+                timestamp: e.timestamp,
+              })),
+              entities: nodes.map(n => ({
+                canonical_id: n.id,
+                canonical_value: n.label || n.name,
+                entity_type: n.type || n.role,
+                risk_score: n.riskScore || 0,
+              })),
+            }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setNeo4jFeedback({
+              type: data.neo4j_online ? 'success' : 'info',
+              message: data.message,
+            });
+            synced = true;
+            break;
+          }
+        } catch { /* try next */ }
+      }
+      if (!synced) {
+        setNeo4jFeedback({
+          type: 'info',
+          message: 'Backend offline. Export Neo4j Cypher script available for manual import.',
+        });
+      }
+    } catch {
+      setNeo4jFeedback({
+        type: 'info',
+        message: 'Cypher script is ready for download and direct execution in Neo4j Browser.',
+      });
+    } finally {
+      setIsSyncingNeo4j(false);
+    }
+  }, [caseId, nodes, edges]);
+
   // ==========================================
   // KEYBOARD SHORTCUTS ENGINE (ARROW KEYS & HOTKEYS)
   // ==========================================
@@ -1800,6 +1897,7 @@ export default function IntelligenceGraph() {
             </div>
 
             {/* Add Evidence / Link */}
+            {/* Add Evidence / Link */}
             <button
               onClick={() => setIsAddEntityOpen(true)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border ${theme.border} ${theme.buttonBg} ${theme.buttonHover} text-xs font-semibold transition`}
@@ -1808,13 +1906,30 @@ export default function IntelligenceGraph() {
               <span>Add Evidence</span>
             </button>
 
+            {/* Neo4j Live Sync Button */}
+            <button
+              onClick={handleSyncNeo4j}
+              disabled={isSyncingNeo4j}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-semibold shadow-sm transition disabled:opacity-60"
+              title="Sync graph nodes and edges to Neo4j instance"
+            >
+              <Database className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{isSyncingNeo4j ? "Syncing Neo4j..." : "Sync Neo4j"}</span>
+            </button>
+
             {/* Export */}
             <div className="relative group">
               <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm transition">
                 <Download className="w-3.5 h-3.5" />
                 <span>Export</span>
               </button>
-              <div className={`absolute right-0 top-full mt-1 hidden group-hover:block w-44 rounded-lg ${theme.cardBg} border ${theme.border} shadow-xl p-1 z-30`}>
+              <div className={`absolute right-0 top-full mt-1 hidden group-hover:block w-52 rounded-lg ${theme.cardBg} border ${theme.border} shadow-xl p-1 z-30`}>
+                <button
+                  onClick={handleExportCypher}
+                  className={`w-full text-left px-3 py-1.5 text-xs text-emerald-300 hover:${theme.buttonHover} hover:text-emerald-200 rounded flex items-center gap-2 font-medium`}
+                >
+                  <Database className="w-3.5 h-3.5 text-emerald-400" /> Export Cypher (.cypher)
+                </button>
                 <button
                   onClick={() => handleExport('svg')}
                   className={`w-full text-left px-3 py-1.5 text-xs ${theme.textSecondary} hover:${theme.buttonHover} hover:${theme.textPrimary} rounded flex items-center gap-2`}
@@ -1831,6 +1946,22 @@ export default function IntelligenceGraph() {
             </div>
           </div>
         </header>
+
+        {/* Neo4j Sync Status Notification */}
+        {neo4jFeedback && (
+          <div className="px-5 py-2 bg-emerald-950/40 border-b border-emerald-500/30 flex items-center justify-between text-xs text-emerald-200 z-10 animate-fade-in">
+            <div className="flex items-center gap-2">
+              <Database className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{neo4jFeedback.message}</span>
+            </div>
+            <button
+              onClick={() => setNeo4jFeedback(null)}
+              className="text-emerald-400 hover:text-white p-0.5 rounded"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
 
         {/* Sub-Header / Search & Quick Keys */}
         <div className={`h-12 shrink-0 flex items-center justify-between px-6 border-b ${theme.border} ${theme.headerBg}/90 backdrop-blur-sm z-10`}>

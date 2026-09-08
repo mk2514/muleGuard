@@ -17,6 +17,9 @@ from PIL import Image as PILImage
 import pytesseract
 import cv2
 
+import database
+import neo4j_service
+
 app = FastAPI(
     title="MuleGuard AI - Data Ingestion Engine",
     version="1.0.0",
@@ -31,6 +34,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+def on_startup():
+    database.init_db()
+
 
 
 def detect_file_type(filename: str, content_sample: str) -> str:
@@ -637,6 +646,110 @@ async def detect_anomalies_endpoint(req: AnomalyDetectionRequest):
     }
 
 
+# =====================================================================
+# PERSISTENT SQLITE DATABASE ENDPOINTS (STAGE 2)
+# =====================================================================
+
+class DatabaseSyncRequest(BaseModel):
+    case_id: str
+    stage: Optional[str] = "output"
+    records: Optional[List[Dict[str, Any]]] = []
+    entities: Optional[List[Dict[str, Any]]] = []
+    case_info: Optional[Dict[str, Any]] = None
+
+
+@app.post("/api/db/sync")
+async def sync_database_endpoint(req: DatabaseSyncRequest):
+    """Saves case evidence records, canonical entities, and case metadata to SQLite."""
+    if req.case_info:
+        database.save_case(req.case_info)
+
+    records_saved = 0
+    if req.records:
+        records_saved = database.save_pipeline_records(req.case_id, req.records, stage=req.stage or "output")
+
+    entities_saved = 0
+    if req.entities:
+        entities_saved = database.save_entities(req.case_id, req.entities)
+
+    return {
+        "status": "success",
+        "case_id": req.case_id,
+        "records_persisted": records_saved,
+        "entities_persisted": entities_saved,
+        "message": f"Successfully persisted {records_saved} records and {entities_saved} entities to SQLite database."
+    }
+
+
+@app.get("/api/db/cases")
+async def get_cases_endpoint():
+    """Retrieves all registered cases from SQLite."""
+    cases = database.get_all_cases()
+    return {"status": "success", "count": len(cases), "cases": cases}
+
+
+@app.get("/api/db/case/{case_id}")
+async def get_case_endpoint(case_id: str):
+    """Retrieves full case dossier with evidence records and resolved entities from SQLite."""
+    c = database.get_case(case_id)
+    records = database.get_case_evidence(case_id)
+    entities = database.get_case_entities(case_id)
+    return {
+        "status": "success",
+        "case_id": case_id,
+        "case": c,
+        "records_count": len(records),
+        "records": records,
+        "entities_count": len(entities),
+        "entities": entities
+    }
+
+
+# =====================================================================
+# NEO4J KNOWLEDGE GRAPH INTEGRATION ENDPOINTS (STAGE 3)
+# =====================================================================
+
+class Neo4jSyncRequest(BaseModel):
+    case_id: str
+    records: Optional[List[Dict[str, Any]]] = []
+    entities: Optional[List[Dict[str, Any]]] = []
+
+
+@app.get("/api/neo4j/status")
+async def get_neo4j_status_endpoint():
+    """Checks whether the Neo4j database instance is reachable."""
+    return neo4j_service.test_neo4j_status()
+
+
+@app.post("/api/neo4j/sync")
+async def sync_neo4j_endpoint(req: Neo4jSyncRequest):
+    """Synchronizes entities and relationships directly into Neo4j using Cypher MERGE."""
+    # If records or entities are empty in request, try retrieving from SQLite
+    records = req.records
+    entities = req.entities
+    if not records:
+        records = database.get_case_evidence(req.case_id)
+    if not entities:
+        entities = database.get_case_entities(req.case_id)
+
+    res = neo4j_service.sync_to_neo4j(req.case_id, records, entities)
+    return res
+
+
+@app.get("/api/neo4j/cypher/{case_id}")
+async def get_neo4j_cypher_endpoint(case_id: str):
+    """Generates pure Cypher script for manual import or offline graph execution."""
+    records = database.get_case_evidence(case_id)
+    entities = database.get_case_entities(case_id)
+    cypher = neo4j_service.generate_cypher_script(case_id, records, entities)
+    return {
+        "status": "success",
+        "case_id": case_id,
+        "cypher_script": cypher
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+

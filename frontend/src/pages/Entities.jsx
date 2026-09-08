@@ -241,6 +241,23 @@ export default function Entities() {
 
       localStorage.setItem(`entities_${activeCaseId}`, JSON.stringify(resolutionResult));
       setResolvedData(resolutionResult);
+
+      // Stage 2: Synchronize canonical entities to SQLite backend
+      try {
+        const apiUrls = ['http://127.0.0.1:8000/api/db/sync', '/api/db/sync'];
+        for (const url of apiUrls) {
+          fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              case_id: activeCaseId,
+              stage: 'entities',
+              entities: finalEntities,
+            }),
+          }).catch(() => {});
+        }
+      } catch { /* background sync */ }
+
       if (finalEntities.length > 0) {
         setSelectedEntityId(finalEntities[0].canonical_id);
       }

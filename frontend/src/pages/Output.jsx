@@ -106,6 +106,22 @@ export default function Output() {
           localStorage.setItem(`pipelineData_${resolvedCaseId}`, JSON.stringify(finalOutput));
         }
         setPersistenceStatus('saved');
+
+        // Stage 2: Synchronize permanently into backend SQLite database
+        try {
+          const apiUrls = ['http://127.0.0.1:8000/api/db/sync', '/api/db/sync'];
+          for (const url of apiUrls) {
+            fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                case_id: resolvedCaseId,
+                stage: 'output',
+                records: finalOutput.records || finalOutput.data || [],
+              }),
+            }).catch(() => {});
+          }
+        } catch { /* background sync */ }
       }
     }
   }, [location.state, searchParams]);
