@@ -416,6 +416,44 @@ export default function AdaptiveAnomalyEngine() {
       });
     }
 
+    // 1D. Multi-Phone Registration in Same Name / Identity
+    const personToPhones = {};
+    const phoneToPersons = {};
+    loadedRecords.forEach(r => {
+      const name = r.source || r.sender_name || r.sender || r.payer;
+      const phone = r.phone || r.calling_no || r.mobile || r.phone_number;
+      if (name && phone && !isLEA(name)) {
+        const pStr = String(phone).trim();
+        const nStr = String(name).trim();
+        if (pStr.length >= 6) {
+          if (!personToPhones[nStr]) personToPhones[nStr] = new Set();
+          personToPhones[nStr].add(pStr);
+          if (!phoneToPersons[pStr]) phoneToPersons[pStr] = new Set();
+          phoneToPersons[pStr].add(nStr);
+        }
+      }
+    });
+
+    Object.entries(personToPhones).forEach(([name, phones]) => {
+      if (phones.size >= 2) {
+        behaviorHits++;
+        detectedAlerts.push({
+          id: `ALT-BEH-MULTISIM-${behaviorHits}`,
+          time: 'Telecom KYC Verification',
+          entity: name,
+          pattern: 'Multi-SIM Registration in Same Name',
+          patternIcon: '📱',
+          severity: phones.size >= 3 ? 'Critical' : 'High',
+          impact: { behavior: true, network: true, rules: true },
+          textMatch: `Identity ${name} has ${phones.size} distinct phone numbers/SIMs registered under the same name (${Array.from(phones).slice(0, 3).join(', ')}), characteristic of SIM farming and syndicate layering.`,
+          codeword: 'Multiple SIMs Registered in Same Name',
+          engineBreakdown: { behavior: 0.94, network: 0.82, rules: 0.80 },
+          status: 'Unresolved',
+          riskScore: phones.size >= 3 ? 93 : 82,
+        });
+      }
+    });
+
     // -------------------------------------------------------------
     // ENGINE 2: NETWORK ENGINE (Shared Accounts & Devices, Relationships, Loops)
     // -------------------------------------------------------------
@@ -534,6 +572,27 @@ export default function AdaptiveAnomalyEngine() {
           });
         }
       });
+    });
+
+    // 2E. Same Phone Number Co-Registered Across Multiple Accounts / Identities
+    Object.entries(phoneToPersons).forEach(([phone, personsSet]) => {
+      if (personsSet.size >= 2) {
+        networkHits++;
+        detectedAlerts.push({
+          id: `ALT-NET-SHAREDPHONE-${networkHits}`,
+          time: 'Identity Cross-Check',
+          entity: Array.from(personsSet)[0],
+          pattern: 'Same Phone Multi-Account Registration',
+          patternIcon: '🔀',
+          severity: 'Critical',
+          impact: { behavior: false, network: true, rules: true },
+          textMatch: `Phone number ${phone} is co-registered across ${personsSet.size} distinct identities (${Array.from(personsSet).slice(0, 3).join(', ')}), indicating shared burner SIM / mule multiplexing.`,
+          codeword: 'Same Phone Registered to Multiple Identities',
+          engineBreakdown: { behavior: 0.65, network: 0.98, rules: 0.85 },
+          status: 'Unresolved',
+          riskScore: 95,
+        });
+      }
     });
 
     // -------------------------------------------------------------

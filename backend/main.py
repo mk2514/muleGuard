@@ -553,6 +553,39 @@ async def detect_anomalies_endpoint(req: AnomalyDetectionRequest):
             "risk_score": 79
         })
 
+    # 1D. Multi-Phone Registration in Same Name / Identity
+    person_to_phones = {}
+    phone_to_persons = {}
+    for r in records:
+        name = r.get("source") or r.get("sender_name") or r.get("sender") or r.get("payer")
+        phone = r.get("phone") or r.get("calling_no") or r.get("mobile") or r.get("phone_number")
+        if name and phone and not is_lea(name):
+            p_str = str(phone).strip()
+            n_str = str(name).strip()
+            if len(p_str) >= 6:
+                if n_str not in person_to_phones: person_to_phones[n_str] = set()
+                person_to_phones[n_str].add(p_str)
+                if p_str not in phone_to_persons: phone_to_persons[p_str] = set()
+                phone_to_persons[p_str].add(n_str)
+
+    for name, phones in person_to_phones.items():
+        if len(phones) >= 2:
+            behavior_hits += 1
+            detected_alerts.append({
+                "id": f"ALT-BEH-MULTISIM-{behavior_hits}",
+                "time": "Telecom KYC Verification",
+                "entity": name,
+                "pattern": "Multi-SIM Registration in Same Name",
+                "pattern_icon": "📱",
+                "severity": "Critical" if len(phones) >= 3 else "High",
+                "impact": {"behavior": True, "network": True, "rules": True},
+                "text_match": f"Identity {name} has {len(phones)} distinct phone numbers/SIMs registered under the same name ({', '.join(list(phones)[:3])}), characteristic of SIM farming and syndicate layering.",
+                "codeword": "Multiple SIMs Registered in Same Name",
+                "engine_breakdown": {"behavior": 0.94, "network": 0.82, "rules": 0.80},
+                "status": "Unresolved",
+                "risk_score": 93 if len(phones) >= 3 else 82
+            })
+
     # -------------------------------------------------------------
     # 2. NETWORK ENGINE (Shared Accounts/Devices, Relationships, Loops)
     # -------------------------------------------------------------
@@ -657,6 +690,25 @@ async def detect_anomalies_endpoint(req: AnomalyDetectionRequest):
                     "risk_score": 88
                 })
                 break
+
+    # 2E. Same Phone Number Co-Registered Across Multiple Accounts / Identities
+    for phone, persons in phone_to_persons.items():
+        if len(persons) >= 2:
+            network_hits += 1
+            detected_alerts.append({
+                "id": f"ALT-NET-SHAREDPHONE-{network_hits}",
+                "time": "Identity Cross-Check",
+                "entity": list(persons)[0],
+                "pattern": "Same Phone Multi-Account Registration",
+                "pattern_icon": "🔀",
+                "severity": "Critical",
+                "impact": {"behavior": False, "network": True, "rules": True},
+                "text_match": f"Phone number {phone} is co-registered across {len(persons)} distinct identities ({', '.join(list(persons)[:3])}), indicating shared burner SIM / mule multiplexing.",
+                "codeword": "Same Phone Registered to Multiple Identities",
+                "engine_breakdown": {"behavior": 0.65, "network": 0.98, "rules": 0.85},
+                "status": "Unresolved",
+                "risk_score": 95
+            })
 
     # -------------------------------------------------------------
     # 3. RULE BASED ENGINE (Known Fraud Patterns & Signatures)

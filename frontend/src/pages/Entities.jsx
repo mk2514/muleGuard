@@ -373,6 +373,30 @@ export default function Entities() {
     ? resolvedData.entities.filter(e => selectedEntity.related_canonical_ids.includes(e.canonical_id)) 
     : [];
 
+  // Entity phone registration stats & cross-identity linking
+  const entityStats = useMemo(() => {
+    if (!resolvedData?.entities) return { personToPhones: new Map(), phoneToPersons: new Map() };
+    const entMap = new Map(resolvedData.entities.map(e => [e.canonical_id, e]));
+    const personToPhones = new Map();
+    const phoneToPersons = new Map();
+
+    resolvedData.entities.forEach(e => {
+      if (e.type === 'Person') {
+        const phones = (e.related_canonical_ids || [])
+          .map(id => entMap.get(id))
+          .filter(rel => rel && rel.type === 'Phone');
+        personToPhones.set(e.canonical_id, phones.length);
+      } else if (e.type === 'Phone') {
+        const persons = (e.related_canonical_ids || [])
+          .map(id => entMap.get(id))
+          .filter(rel => rel && (rel.type === 'Person' || rel.type === 'Bank Account'));
+        phoneToPersons.set(e.canonical_id, persons.length);
+      }
+    });
+
+    return { personToPhones, phoneToPersons };
+  }, [resolvedData]);
+
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-800">
       <div className="flex-1 flex flex-col overflow-y-auto p-6 space-y-6">
@@ -515,11 +539,15 @@ export default function Entities() {
                                 <th className="p-3 font-semibold">Type</th>
                                 <th className="p-3 font-semibold">Canonical ID</th>
                                 <th className="p-3 font-semibold text-center">Linked Records</th>
+                                <th className="p-3 font-semibold text-center bg-purple-50 text-purple-900 border-x border-purple-100">Phones in Same Name / ID</th>
                                 <th className="p-3 font-semibold text-center">Actions</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                              {filteredEntities.map(entity => (
+                              {filteredEntities.map(entity => {
+                                const pPhonesCount = entityStats.personToPhones.get(entity.canonical_id) || 0;
+                                const phPersonsCount = entityStats.phoneToPersons.get(entity.canonical_id) || 0;
+                                return (
                                 <tr 
                                   key={entity.canonical_id} 
                                   onClick={() => setSelectedEntityId(entity.canonical_id)}
@@ -533,12 +561,41 @@ export default function Entities() {
                                   <td className="p-3 text-slate-500">{entity.type}</td>
                                   <td className="p-3 font-mono text-slate-500">{entity.canonical_id}</td>
                                   <td className="p-3 text-center font-bold text-slate-700">{entity.linked_records.length}</td>
+                                  <td className="p-3 text-center bg-purple-50/30 border-x border-purple-100">
+                                    {entity.type === 'Person' ? (
+                                      <span
+                                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                          pPhonesCount >= 3
+                                            ? 'bg-red-100 text-red-700 border border-red-200'
+                                            : pPhonesCount >= 2
+                                            ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                            : 'bg-slate-100 text-slate-700'
+                                        }`}
+                                      >
+                                        {pPhonesCount} {pPhonesCount === 1 ? 'SIM' : 'SIMs'} Registered
+                                      </span>
+                                    ) : entity.type === 'Phone' ? (
+                                      <span
+                                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                          phPersonsCount >= 2
+                                            ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                                            : 'bg-slate-100 text-slate-600'
+                                        }`}
+                                      >
+                                        {phPersonsCount >= 2
+                                          ? `⚠️ Co-Registered (${phPersonsCount} Profiles)`
+                                          : 'Single Profile'}
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-400">—</span>
+                                    )}
+                                  </td>
                                   <td className="p-3 text-center flex items-center justify-center space-x-2">
                                     <button className="text-slate-400 hover:text-blue-600"><Eye className="w-4 h-4" /></button>
                                     <button className="text-slate-400 hover:text-blue-600"><LinkIcon className="w-4 h-4" /></button>
                                   </td>
                                 </tr>
-                              ))}
+                              );})}
                             </tbody>
                           </table>
                         </div>
